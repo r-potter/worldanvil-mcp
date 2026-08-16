@@ -9,7 +9,7 @@ decision from the diff.
 | **Upstream** | [wlcarden/worldanvil-claude-plugin](https://github.com/wlcarden/worldanvil-claude-plugin) (npm `worldanvil-mcp`) |
 | **This fork** | `git@github.com:r-potter/worldanvil-mcp.git` |
 | **Fork point** | `f8243b6` — *fix: green CI before v1.12.0 publish*, v1.12.0, 2026-06-01 |
-| **Local commits** | 1 |
+| **Local commits** | 2 |
 
 Regenerate the authoritative list at any time:
 
@@ -81,7 +81,8 @@ decision rather than oversight.
 
 - **Version** is still `1.12.0`, matching upstream. Not bumped; decide before
   publishing anything from this fork under the same package name.
-- **`main`** sits exactly at the fork point. Local work lives on branches.
+- **`main`** tracks upstream linearly — local work is branched and
+  fast-forwarded back on, so `main` stays rebasable onto a future upstream.
 
 ---
 
