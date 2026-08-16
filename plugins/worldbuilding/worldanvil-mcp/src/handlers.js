@@ -5,6 +5,7 @@
  */
 
 import { markdownToBBCode, convertFieldsToBBCode } from "./utils.js";
+import { compactEntity } from "./response.js";
 
 /**
  * Create a successful response with JSON content
@@ -27,6 +28,19 @@ function errorResponse(error) {
     content: [{ type: "text", text: `Error: ${error.message}` }],
     isError: true,
   };
+}
+
+/**
+ * Create a response for a write call, compacted unless the caller asked for
+ * the raw entity. World Anvil echoes ~130 mostly-null fields plus the full
+ * world object back on every write; see response.js.
+ *
+ * @param {*} data - API response
+ * @param {Object} args - Tool arguments, read for `verbose`
+ * @returns {Object} MCP tool response
+ */
+function writeResponse(data, args) {
+  return jsonResponse(args.verbose ? data : compactEntity(data));
 }
 
 /**
@@ -86,7 +100,7 @@ export async function handleToolCall(name, args, client) {
           Object.assign(data, convertFieldsToBBCode(args.fields));
         }
         if (args.category_id) data.category = { id: args.category_id };
-        return jsonResponse(await client.createArticle(data));
+        return writeResponse(await client.createArticle(data), args);
       }
 
       case "worldanvil_update_article": {
@@ -99,7 +113,10 @@ export async function handleToolCall(name, args, client) {
           Object.assign(data, convertFieldsToBBCode(args.fields));
         }
         if (args.category_id) data.category = { id: args.category_id };
-        return jsonResponse(await client.updateArticle(args.article_id, data));
+        return writeResponse(
+          await client.updateArticle(args.article_id, data),
+          args,
+        );
       }
 
       case "worldanvil_delete_article":

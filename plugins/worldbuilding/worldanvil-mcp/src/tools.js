@@ -155,6 +155,11 @@ export function getToolDefinitions() {
             description:
               "ID of the category to assign this article to (optional)",
           },
+          verbose: {
+            type: "boolean",
+            description:
+              "Return the complete article entity instead of a compacted one. By default the response drops empty fields and collapses nested entities to references; every field that holds a value is returned in full, so verbose is rarely needed.",
+          },
         },
         required: ["title", "world_id"],
       },
@@ -194,6 +199,11 @@ export function getToolDefinitions() {
             type: "string",
             description:
               "ID of the category to assign this article to (optional)",
+          },
+          verbose: {
+            type: "boolean",
+            description:
+              "Return the complete article entity instead of a compacted one. By default the response drops empty fields and collapses nested entities to references; every field that holds a value is returned in full, so verbose is rarely needed.",
           },
         },
         required: ["article_id"],

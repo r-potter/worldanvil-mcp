@@ -220,6 +220,14 @@ Create an article with:
 - fields: { "geography": "Central district", "population": "500 scholars" }
 ```
 
+**Response size:** `create_article` and `update_article` return a compacted
+response — identifiers plus the fields that actually hold a value, with nested
+entities collapsed to `{ id, title, slug, url }`. World Anvil otherwise echoes
+back roughly 130 fields (nearly all null) plus the entire world object with
+every subscriber group inlined. Field values are returned in full, so the
+response can still be read back to confirm a write landed. Pass `verbose: true`
+for the raw entity.
+
 ### Categories
 
 | Tool | Description |

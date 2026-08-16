@@ -39,6 +39,38 @@ npx vitest run test/utils.test.js
 
 Tests load credentials from `.env` in the package directory (use `dotenv`). Integration tests hit the real WorldAnvil API and require `WA_AUTH_TOKEN` to be set.
 
+## Testing
+
+> ### Use the Sandbox world. Never test against Fallen London.
+
+Two worlds exist on the account. Only one is safe.
+
+| World | ID | State | Use |
+|---|---|---|---|
+| **Sandbox** | `f5deaaa1-6464-44dc-821a-e12cb8563692` | private | **Test here.** Slug `sandbox-god-machine` |
+| Fallen London | `40430485-5fd5-47e7-8932-d99f498f07d0` | **public** | **Live campaign. Do not write to it.** |
+
+Sandbox carries two real subscriber groups, which matter for anything touching gating:
+
+- *Adventurers of Sandbox Party* — `a781174f-8c28-4fd3-bb3d-d893436598b1`
+- *Sandbox Campaign Players* — `2645a915-01fd-4229-836f-44dea5eed715`
+
+**One trap worth knowing before drawing conclusions about `state`.** Sandbox is a **private** world; Fallen London is **public**. In a public world, an article set to `public` is genuinely readable by anyone with the link, and `private` means gated to a subscriber group. In a private world the whole thing is behind the wall regardless, so an article marked `public` there is *not* world-readable. **A gating test that passes in Sandbox does not prove the same behaviour in a public world**, and that difference is easy to mistake for a bug in either direction.
+
+Prefer recorded fixtures over live calls where a test can be written either way. Live calls against Sandbox are acceptable; live calls against Fallen London are not.
+
+Recorded fixtures live in `test/fixtures/`. `article-write-response.json` is a real PUT/PATCH `/article` pair captured from Sandbox — use it rather than hand-building a response shape, which is how the first attempt at the issue #1 fix got the field names wrong.
+
+## The Auth Token
+
+`WA_AUTH_TOKEN` is supplied by environment variable and **must never be committed**. The realistic ways it escapes are not `git add .env` — they are:
+
+- a recorded HTTP fixture captured with the header intact
+- a test snapshot containing a full request object
+- a debug log pasted into an issue
+
+**Scrub request headers when recording fixtures**, and check any new fixture for the token before committing it.
+
 ## Environment Variables
 
 | Variable | Required | Purpose |
