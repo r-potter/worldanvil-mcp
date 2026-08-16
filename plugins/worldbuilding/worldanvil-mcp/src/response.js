@@ -19,6 +19,45 @@
 // down to a reference. Everything else on the nested object is dropped.
 const REFERENCE_KEYS = ["id", "title", "slug", "url"];
 
+// World Anvil's "no folder / world root" sentinel, returned as either type.
+const ROOT_FOLDER = ["-1", -1];
+
+/**
+ * Reconcile an article's category across World Anvil's two serialisations.
+ *
+ * The full serialisation (PUT, GET granularity=2) reports the category as a
+ * `category` object and leaves `folderId` at -1 regardless — there the -1 reads
+ * as though the category had been dropped, when it has not. The summary
+ * serialisation (PATCH) does the opposite: no `category` at all, with the
+ * containing category's id in `folderId`, and -1 genuinely meaning the root.
+ *
+ * Both are correct; neither is readable without knowing which one you have. So
+ * `category` becomes the single answer and the raw `folderId` is dropped:
+ * present means that category, absent means the world root.
+ *
+ * Article-shaped responses only — a Block also carries `folderId` alongside a
+ * separate `blockfolder`, and means something different by it.
+ *
+ * @param {*} entity - Parsed article write response
+ * @returns {*} Response with category reconciled and folderId removed
+ */
+export function normaliseArticleCategory(entity) {
+  if (!entity || typeof entity !== "object" || Array.isArray(entity)) {
+    return entity;
+  }
+  if (!("folderId" in entity)) return entity;
+
+  const { folderId, ...rest } = entity;
+  const inRoot = ROOT_FOLDER.includes(folderId);
+
+  // Summary serialisation: recover the category the caller actually wants.
+  if (!inRoot && !rest.category) {
+    rest.category = { id: String(folderId) };
+  }
+
+  return rest;
+}
+
 /**
  * Compact a World Anvil API response for return to an MCP client.
  *

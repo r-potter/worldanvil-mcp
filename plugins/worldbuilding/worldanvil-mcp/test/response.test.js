@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "fs";
-import { compactEntity } from "../src/response.js";
+import { compactEntity, normaliseArticleCategory } from "../src/response.js";
 import { handleToolCall } from "../src/handlers.js";
 
 // ---------------------------------------------------------------------------
@@ -242,5 +242,127 @@ describe("Article write handlers", () => {
 
     const [, data] = client.updateArticle.mock.calls[0];
     expect(data).not.toHaveProperty("verbose");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ISSUES.md #8 — folderId vs category
+//
+// Established against Sandbox on 2026-08-16. World Anvil has two article
+// serialisations and both are internally correct:
+//   PUT / GET granularity=2 -> `category` object, `folderId` always -1
+//   PATCH                   -> no `category`, containing category id in
+//                              `folderId`, with -1 meaning the world root
+// Neither is readable without knowing which one you were handed.
+// ---------------------------------------------------------------------------
+
+describe("normaliseArticleCategory", () => {
+  it("drops the meaningless -1 from a create response", () => {
+    const result = normaliseArticleCategory({
+      id: "a1",
+      folderId: -1,
+      category: { id: "cat-9", title: "Geography" },
+    });
+
+    expect(result).not.toHaveProperty("folderId");
+    expect(result.category).toEqual({ id: "cat-9", title: "Geography" });
+  });
+
+  it("recovers the category from folderId on a patch response", () => {
+    const result = normaliseArticleCategory({
+      id: "a1",
+      folderId: "cat-9",
+      category: null,
+    });
+
+    expect(result).not.toHaveProperty("folderId");
+    expect(result.category).toEqual({ id: "cat-9" });
+  });
+
+  it("reports no category for an article in the world root", () => {
+    const result = normaliseArticleCategory({
+      id: "a1",
+      folderId: "-1",
+      category: null,
+    });
+
+    expect(result).not.toHaveProperty("folderId");
+    expect(result.category).toBeFalsy();
+  });
+
+  it("does not overwrite a category that is already present", () => {
+    const result = normaliseArticleCategory({
+      id: "a1",
+      folderId: "cat-1",
+      category: { id: "cat-9", title: "Geography" },
+    });
+
+    expect(result.category).toEqual({ id: "cat-9", title: "Geography" });
+  });
+
+  it("leaves responses without folderId alone", () => {
+    const entity = { id: "a1", title: "x" };
+
+    expect(normaliseArticleCategory(entity)).toEqual(entity);
+  });
+
+  it("passes non-objects through", () => {
+    expect(normaliseArticleCategory(null)).toBe(null);
+    expect(normaliseArticleCategory("ok")).toBe("ok");
+  });
+});
+
+describe("article write handlers reconcile the category", () => {
+  function parse(response) {
+    return JSON.parse(response.content[0].text);
+  }
+
+  it("never surfaces a bare folderId on create", async () => {
+    const client = {
+      createArticle: vi.fn(async () => makeArticleResponse()),
+    };
+    const result = parse(
+      await handleToolCall(
+        "worldanvil_create_article",
+        { title: "x", world_id: "w1" },
+        client,
+      ),
+    );
+
+    expect(result).not.toHaveProperty("folderId");
+  });
+
+  it("turns a patch folderId into a category", async () => {
+    const client = {
+      updateArticle: vi.fn(async () => ({
+        success: true,
+        id: "a1",
+        folderId: "cat-9",
+      })),
+    };
+    const result = parse(
+      await handleToolCall(
+        "worldanvil_update_article",
+        { article_id: "a1", title: "x" },
+        client,
+      ),
+    );
+
+    expect(result).not.toHaveProperty("folderId");
+    expect(result.category).toEqual({ id: "cat-9" });
+  });
+
+  it("leaves the raw entity untouched under verbose", async () => {
+    const raw = { success: true, id: "a1", folderId: "cat-9" };
+    const client = { updateArticle: vi.fn(async () => raw) };
+    const result = parse(
+      await handleToolCall(
+        "worldanvil_update_article",
+        { article_id: "a1", verbose: true },
+        client,
+      ),
+    );
+
+    expect(result).toEqual(raw);
   });
 });

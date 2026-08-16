@@ -240,3 +240,33 @@ arrives rather than before.
 **Why it matters.** It reads exactly like the category having been silently dropped. It cost a needless round trip to disprove — the authoritative value is the `category` object returned by `get_article`.
 
 **Fix.** Map it correctly, or omit it from responses so it cannot mislead. May be upstream API behaviour passed through unchanged, in which case document it.
+
+**Status — fixed and verified against Sandbox on 2026-08-16. Not a malformed
+request, and `folderId` is not mismapped.**
+
+The requests were always correct: the category applies every time, confirmed by
+reading the article back. `folderId` is not wrong either. World Anvil has **two
+article serialisations, and each is internally consistent**:
+
+| response | `category` | `folderId` |
+|---|---|---|
+| `PUT` (create) | the real category object | `-1` always — carries nothing |
+| `GET` granularity=2 | the real category object | `"-1"` always — carries nothing |
+| `PATCH`, article in a category | absent | **the category's UUID** |
+| `PATCH`, article in the world root | absent | `"-1"`, correctly meaning root |
+
+So "some update responses return the real category; others return `-1` for the
+same article" was never inconsistency — it is whether the article *has* a
+category, read through a summary serialisation in which `folderId` is the
+container id. The misleading half is the *full* serialisation, where `folderId`
+sits at `-1` next to a perfectly good category and reads as though the category
+had been dropped.
+
+`normaliseArticleCategory()` in `src/response.js` reconciles the two on article
+writes: `category` becomes the single answer — present means that category,
+absent means the world root — and the raw `folderId` is removed. Applied to
+`create_article` and `update_article` only; a Block also carries `folderId` and
+means something different by it. `verbose: true` still returns the untouched
+entity.
+
+Tests in `test/response.test.js`.

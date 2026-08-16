@@ -5,7 +5,7 @@
  */
 
 import { markdownToBBCode, convertFieldsToBBCode } from "./utils.js";
-import { compactEntity } from "./response.js";
+import { compactEntity, normaliseArticleCategory } from "./response.js";
 
 /**
  * Create a successful response with JSON content
@@ -31,16 +31,20 @@ function errorResponse(error) {
 }
 
 /**
- * Create a response for a write call, compacted unless the caller asked for
- * the raw entity. World Anvil echoes ~130 mostly-null fields plus the full
- * world object back on every write; see response.js.
+ * Create a response for an article write.
+ *
+ * World Anvil echoes ~130 mostly-null fields plus the full world object back
+ * on every write, and reports the article's category differently depending on
+ * the verb. Both are reconciled here; `verbose` returns the untouched entity.
+ * See response.js.
  *
  * @param {*} data - API response
  * @param {Object} args - Tool arguments, read for `verbose`
  * @returns {Object} MCP tool response
  */
-function writeResponse(data, args) {
-  return jsonResponse(args.verbose ? data : compactEntity(data));
+function articleWriteResponse(data, args) {
+  if (args.verbose) return jsonResponse(data);
+  return jsonResponse(compactEntity(normaliseArticleCategory(data)));
 }
 
 /**
@@ -103,7 +107,7 @@ export async function handleToolCall(name, args, client) {
           Object.assign(data, convertFieldsToBBCode(args.fields));
         }
         if (args.category_id) data.category = { id: args.category_id };
-        return writeResponse(await client.createArticle(data), args);
+        return articleWriteResponse(await client.createArticle(data), args);
       }
 
       case "worldanvil_update_article": {
@@ -116,7 +120,7 @@ export async function handleToolCall(name, args, client) {
           Object.assign(data, convertFieldsToBBCode(args.fields));
         }
         if (args.category_id) data.category = { id: args.category_id };
-        return writeResponse(
+        return articleWriteResponse(
           await client.updateArticle(args.article_id, data),
           args,
         );

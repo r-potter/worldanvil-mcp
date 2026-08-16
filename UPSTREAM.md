@@ -76,7 +76,26 @@ into an error naming the working path (folders, then blocks per folder).
 **Upstream-worthy: yes**, unreservedly. ISSUES.md #3a — note that the issue's
 own diagnosis and suggested fix were both wrong, corrected in place.
 
-## 4. Local documentation
+## 4. One answer for an article's category
+
+**Files:** `src/response.js` · `src/handlers.js` · `test/response.test.js`
+
+World Anvil has two article serialisations. The full one (PUT, GET
+granularity=2) reports the category as a `category` object and parks `folderId`
+at -1, where it reads as though the category had been dropped. The summary one
+(PATCH) omits `category` and puts the containing category's id in `folderId`,
+with -1 genuinely meaning the world root. Both are correct; neither is readable
+without knowing which you were handed.
+
+`normaliseArticleCategory()` makes `category` the single answer on article
+writes and removes the raw `folderId`. Article-shaped responses only — a Block
+carries `folderId` too and means something else by it.
+
+**Upstream-worthy: probably**, as response shaping rather than a defect — the
+API is not wrong, just inconsistent between verbs. ISSUES.md #8, whose
+"folderId is not the category" framing was itself mistaken.
+
+## 5. Local documentation
 
 **Files:** `CLAUDE.md` (`## Testing`, `## The Auth Token`) · `ISSUES.md`
 
@@ -87,7 +106,7 @@ driving the server against a live world.
 IDs. ISSUES.md marks per-issue which findings are worth reporting upstream
 independently of this fork.
 
-## 5. Recorded test fixture
+## 6. Recorded test fixture
 
 **File:** `test/fixtures/article-write-response.json`
 
