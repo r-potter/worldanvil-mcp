@@ -6,6 +6,8 @@ Defects found driving `worldanvil-mcp@1.12.0` against a live World Anvil world, 
 
 **Upstream?** marks whether a fix looks like a general bug worth a pull request, or a local preference better kept in a fork.
 
+Fixes that have actually landed are catalogued in [UPSTREAM.md](UPSTREAM.md), alongside the local decisions a future merge from upstream must not undo.
+
 ---
 
 ## 1. Response payloads are enormous — *upstream: probably, behind a flag*
