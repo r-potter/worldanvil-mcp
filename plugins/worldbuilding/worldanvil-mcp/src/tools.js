@@ -83,7 +83,8 @@ export function getToolDefinitions() {
     // ===== ARTICLES =====
     {
       name: "worldanvil_list_articles",
-      description: "List articles in a specific world",
+      description:
+        "List articles in a specific world. Returns articles from every category by default; pass category_id to restrict the listing. Results are paginated — a full result page means there are probably more, so page with offset until a short page comes back.",
       inputSchema: {
         type: "object",
         properties: {
@@ -93,11 +94,17 @@ export function getToolDefinitions() {
           },
           offset: {
             type: "number",
-            description: "Pagination offset (optional)",
+            description: "Pagination offset (optional, default 0)",
           },
           limit: {
             type: "number",
-            description: "Maximum number of articles to return (optional)",
+            description:
+              "Maximum number of articles to return (optional, default 50)",
+          },
+          category_id: {
+            type: "string",
+            description:
+              'Restrict the listing to one category (optional). Use "-1" for articles sitting in the world root. Omit to list the whole world.',
           },
         },
         required: ["world_id"],

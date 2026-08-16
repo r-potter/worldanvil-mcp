@@ -81,6 +81,9 @@ export async function handleToolCall(name, args, client) {
         const options = {};
         if (args.offset !== undefined) options.offset = args.offset;
         if (args.limit !== undefined) options.limit = args.limit;
+        // Only filter when asked. `-1` means the world root, not "no filter".
+        if (args.category_id !== undefined)
+          options.category = { id: args.category_id };
         return jsonResponse(await client.listArticles(args.world_id, options));
       }
 

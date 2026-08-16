@@ -9,7 +9,7 @@ decision from the diff.
 | **Upstream** | [wlcarden/worldanvil-claude-plugin](https://github.com/wlcarden/worldanvil-claude-plugin) (npm `worldanvil-mcp`) |
 | **This fork** | `git@github.com:r-potter/worldanvil-mcp.git` |
 | **Fork point** | `f8243b6` — *fix: green CI before v1.12.0 publish*, v1.12.0, 2026-06-01 |
-| **Local commits** | 2 |
+| **Local commits** | 3 |
 
 Regenerate the authoritative list at any time:
 
@@ -38,7 +38,21 @@ the content drops 68%).
 a flag* — the flag now exists, so the condition is met. A PR should lead with
 `verbose`, since the change is behaviour-altering by default.
 
-## 2. Local documentation
+## 2. `list_articles` lists the whole world
+
+**Files:** `src/api-client.js` · `src/handlers.js` · `src/tools.js` ·
+`test/list-articles.test.js`
+
+`listArticles` hardcoded `category: { id: "-1" }` when no category was given,
+and `-1` is the world root rather than "no filter" — so every listing was
+silently restricted to uncategorised articles while looking complete. The key
+is no longer sent unless a filter is asked for, and `category_id` is exposed on
+the tool for deliberate filtering.
+
+**Upstream-worthy: yes**, unreservedly — a plain defect with a one-line fix and
+no local preference in it. ISSUES.md #2.
+
+## 3. Local documentation
 
 **Files:** `CLAUDE.md` (`## Testing`, `## The Auth Token`) · `ISSUES.md`
 
@@ -49,7 +63,7 @@ driving the server against a live world.
 IDs. ISSUES.md marks per-issue which findings are worth reporting upstream
 independently of this fork.
 
-## 3. Recorded test fixture
+## 4. Recorded test fixture
 
 **File:** `test/fixtures/article-write-response.json`
 

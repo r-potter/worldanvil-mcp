@@ -223,6 +223,12 @@ export class WorldAnvilClient {
 
   /**
    * List articles in a world
+   *
+   * Omitting `category` lists every article in the world. Sending
+   * `category: { id: "-1" }` restricts the listing to the world root, which
+   * this method used to do unconditionally — on a world of any size that
+   * returned a handful of uncategorised articles while looking like a
+   * complete listing. Pass `options.category` only to filter deliberately.
    */
   async listArticles(worldId, options = {}) {
     const body = {
@@ -232,8 +238,6 @@ export class WorldAnvilClient {
 
     if (options.category !== undefined) {
       body.category = options.category;
-    } else {
-      body.category = { id: "-1" };
     }
 
     return this.request(`/world/articles?id=${worldId}`, "POST", body);

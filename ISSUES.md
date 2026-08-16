@@ -62,6 +62,30 @@ The `folderId: -1` in the compacted output is issue 8 and is left alone.
 
 **Fix.** Paginate properly, or remove the tool so nobody relies on it. The current working practice is to call `get_category` on the target category *and every child category* instead, which is correct but ought not to be necessary.
 
+**Status — fixed and verified against Sandbox on 2026-08-16.**
+
+**It was never a pagination bug.** `listArticles` hardcoded `category: { id: "-1" }`
+whenever no category was passed, and `-1` is the *world root*, not "no filter".
+Every listing was therefore filtered to root. Fallen London's root holds exactly
+one article, which is why `limit` appeared to have no effect and any `offset`
+came back empty — there was only ever one row to page through. `limit` and
+`offset` both work correctly and always did.
+
+The fix is to stop sending the key. Measured on Sandbox with one article placed
+inside a category:
+
+| request | articles | categorised one visible |
+|---|---|---|
+| no `category_id` (new default) | 5 | **yes** |
+| `category_id: "-1"` | 4 | no |
+| `category_id: <category>` | 1 | yes |
+
+`category_id` is now exposed on the tool, so filtering to one category — or to
+the root with `"-1"` — is available deliberately rather than by accident. The
+`get_category` walkaround is no longer necessary.
+
+Tests in `test/list-articles.test.js`.
+
 ---
 
 ## 3. Three silent write failures — *upstream: yes*
