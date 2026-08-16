@@ -175,6 +175,7 @@ describe("Article handlers", () => {
         {
           title: "Thronehold",
           world_id: "world-1",
+          template: "settlement",
           category_id: "cat-cities",
         },
         client,
@@ -191,6 +192,7 @@ describe("Article handlers", () => {
         {
           title: "Orphan Article",
           world_id: "world-1",
+          template: "article",
         },
         client,
       );

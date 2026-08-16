@@ -181,7 +181,7 @@ describe("Article write handlers", () => {
     const result = parse(
       await handleToolCall(
         "worldanvil_create_article",
-        { title: "The Iron Mountains", world_id: "world-1" },
+        { title: "The Iron Mountains", world_id: "world-1", template: "article" },
         client,
       ),
     );
@@ -196,7 +196,7 @@ describe("Article write handlers", () => {
     const result = parse(
       await handleToolCall(
         "worldanvil_create_article",
-        { title: "The Iron Mountains", world_id: "world-1", verbose: true },
+        { title: "The Iron Mountains", world_id: "world-1", template: "article", verbose: true },
         client,
       ),
     );
@@ -324,7 +324,7 @@ describe("article write handlers reconcile the category", () => {
     const result = parse(
       await handleToolCall(
         "worldanvil_create_article",
-        { title: "x", world_id: "w1" },
+        { title: "x", world_id: "w1", template: "article" },
         client,
       ),
     );
@@ -364,5 +364,48 @@ describe("article write handlers reconcile the category", () => {
     );
 
     expect(result).toEqual(raw);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// create_article requires a template
+//
+// The API rejects a create without templateType with a 422 carrying a PHP
+// stack trace, while the schema previously marked only title and world_id as
+// required — so every generic article creation failed unless the caller
+// happened to pass one.
+// ---------------------------------------------------------------------------
+
+describe("create_article template requirement", () => {
+  it("refuses a create with no template, before calling the API", async () => {
+    const client = { createArticle: vi.fn() };
+    const result = await handleToolCall(
+      "worldanvil_create_article",
+      { title: "x", world_id: "w1" },
+      client,
+    );
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("template");
+    expect(client.createArticle).not.toHaveBeenCalled();
+  });
+
+  it("sends templateType when a template is given", async () => {
+    const client = { createArticle: vi.fn(async () => makeArticleResponse()) };
+    await handleToolCall(
+      "worldanvil_create_article",
+      { title: "x", world_id: "w1", template: "character" },
+      client,
+    );
+
+    const [data] = client.createArticle.mock.calls[0];
+    expect(data.templateType).toBe("character");
+  });
+
+  it("declares template required in the tool schema", async () => {
+    const { getToolDefinitions } = await import("../src/tools.js");
+    const tool = getToolDefinitions().find((t) => t.name === "worldanvil_create_article");
+
+    expect(tool.inputSchema.required).toContain("template");
   });
 });

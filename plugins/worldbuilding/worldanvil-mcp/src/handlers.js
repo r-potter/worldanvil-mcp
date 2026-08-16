@@ -95,11 +95,22 @@ export async function handleToolCall(name, args, client) {
         return jsonResponse(await client.getArticle(args.article_id));
 
       case "worldanvil_create_article": {
+        // The API requires templateType and rejects a create without it with a
+        // 422 carrying a PHP stack trace. Say so plainly instead.
+        if (!args.template) {
+          throw new Error(
+            'create_article requires `template`. Use "article" for a generic ' +
+              "article, or a specific type (character, location, organization, " +
+              "species, item, document, ...). The template cannot be changed " +
+              "later without losing template-specific fields.",
+          );
+        }
+
         const data = {
           title: args.title,
           world: { id: args.world_id },
+          templateType: args.template,
         };
-        if (args.template !== undefined) data.templateType = args.template;
         if (args.content !== undefined)
           data.content = markdownToBBCode(args.content);
         if (args.icon !== undefined) data.icon = args.icon;

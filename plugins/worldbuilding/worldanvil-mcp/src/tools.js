@@ -139,7 +139,7 @@ export function getToolDefinitions() {
           template: {
             type: "string",
             description:
-              'The template type for the article. Use "article" for generic articles, or specific types like: law, species, ethnicity, material, document, technology, organization, location, character, item, etc.',
+              'Required. The template type for the article — the API rejects a create without it. Use "article" for generic articles, or a specific type: law, species, ethnicity, material, document, technology, organization, location, character, item, etc. Templates cannot be changed later without losing template-specific fields, so choose deliberately.',
           },
           content: {
             type: "string",
@@ -168,7 +168,7 @@ export function getToolDefinitions() {
               "Return the complete article entity instead of a compacted one. By default the response drops empty fields and collapses nested entities to references; every field that holds a value is returned in full, so verbose is rarely needed.",
           },
         },
-        required: ["title", "world_id"],
+        required: ["title", "world_id", "template"],
       },
     },
     {

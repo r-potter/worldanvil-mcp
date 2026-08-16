@@ -95,7 +95,22 @@ carries `folderId` too and means something else by it.
 API is not wrong, just inconsistent between verbs. ISSUES.md #8, whose
 "folderId is not the category" framing was itself mistaken.
 
-## 5. Local documentation
+## 5. `create_article` requires a template
+
+**Files:** `src/tools.js` · `src/handlers.js` · `test/response.test.js`
+
+The schema marked only `title` and `world_id` required; the API rejects a
+create without `templateType` with a 422 carrying a PHP stack trace. So the
+documented minimal call could never succeed. `template` is now required in the
+schema and guarded in the handler, which refuses before reaching the network.
+
+Required rather than defaulted to `"article"` on purpose: a template cannot be
+changed later without losing template-specific fields, so a silent default
+would commit the caller to the wrong one. ISSUES.md #9.
+
+**Upstream-worthy: yes**, unreservedly.
+
+## 6. Local documentation
 
 **Files:** `CLAUDE.md` (`## Testing`, `## The Auth Token`) · `ISSUES.md`
 
@@ -106,7 +121,7 @@ driving the server against a live world.
 IDs. ISSUES.md marks per-issue which findings are worth reporting upstream
 independently of this fork.
 
-## 6. Recorded test fixture
+## 7. Recorded test fixture
 
 **File:** `test/fixtures/article-write-response.json`
 

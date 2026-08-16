@@ -54,6 +54,9 @@ The `folderId: -1` in the compacted output is issue 8 and is left alone.
 
 ---
 
+
+---
+
 ## 2. `list_articles` does not list articles — *upstream: yes*
 
 **Symptom.** Called on a world with dozens of articles it returned exactly **one** — the single article sitting in the world root — and returned it regardless of `limit`, with an empty result at any `offset`.
@@ -85,6 +88,9 @@ the root with `"-1"` — is available deliberately rather than by accident. The
 `get_category` walkaround is no longer necessary.
 
 Tests in `test/list-articles.test.js`.
+
+---
+
 
 ---
 
@@ -157,39 +163,6 @@ Tests in `test/list-articles.test.js`.
 
 ---
 
-## Blocked on an application key
-
-**Status: requested, not yet issued (as of 2026-08-16).** The server currently
-runs in proxy mode — `WA_AUTH_TOKEN` only, with the shared public proxy
-injecting its own application key. Setting `WA_APP_KEY` switches to direct mode
-against `www.worldanvil.com`. Three things are waiting on that.
-
-**1. The `list_blocks` 403.** `/world/blocks` returns `403 access_denied` on
-every call tested, while `/world/articles`, `/world/categories` and
-`/world/blockfolders` all work on the same world with the same token. That
-pattern fits an *application*-scoped permission rather than an account tier —
-in which case the shared proxy's app key lacks a scope our own key might carry.
-
-```bash
-WA_APP_KEY=<key> WA_AUTH_TOKEN=<token> node -e "…listBlocks(SANDBOX)…"
-```
-
-If it succeeds, remove the 403 translation added in `api-client.js` and
-`list_blocks` becomes genuinely useful. If it still 403s, the endpoint is not
-available to this account at all and should be removed rather than explained.
-
-**2. 86 integration tests that have never run here.** `test/api.test.js` (75
-cases) and `test/timeline.test.js` (38 cases) both gate on
-`WA_AUTH_TOKEN && WA_APP_KEY` and skip wholesale without both. Requiring the
-key was deliberate — commit `d9bee80`, *"require both credentials for
-integration tests to avoid proxy flakiness"* — so this is not a bug to fix by
-loosening the gate. It does mean every fix in this file has been verified by
-hand-written probes rather than by the suite that exists for the purpose.
-
-**3. Issue 7, the 30-second timeout.** Direct mode removes the proxy hop
-entirely, which is the cleanest way to establish whether the timeout is
-client-side, proxy-side, or World Anvil's. Investigate that one *after* the key
-arrives rather than before.
 
 ---
 
@@ -205,6 +178,9 @@ arrives rather than before.
 
 ---
 
+
+---
+
 ## 5. Field length caps return raw SQL, and roll back their neighbours — *upstream: yes*
 
 **Symptom.** An over-length value on a capped field — `currentstatus` is 255 — returns a **422 carrying `Data too long for column`**, a raw database error rather than anything a caller can act on.
@@ -212,6 +188,9 @@ arrives rather than before.
 **The worse half.** The update is a single statement, so **every other field in the same call is rolled back with it.** A long value in one field silently discards the correct values sent alongside it.
 
 **Fix.** Validate lengths client-side before sending and report *which* field failed and by how much. Failing that, at minimum translate the SQL error into something readable.
+
+---
+
 
 ---
 
@@ -223,6 +202,9 @@ arrives rather than before.
 
 ---
 
+
+---
+
 ## 7. 30-second timeout on large multi-field calls — *upstream: investigate*
 
 **Symptom.** A call setting four or five long fields timed out at 30 seconds.
@@ -230,6 +212,9 @@ arrives rather than before.
 **Mitigating detail.** When it fired, the write had landed **nothing** — `updateDate` was unchanged — so a timeout is safe to retry. But that is only knowable by reading the article back, and a timeout is otherwise indistinguishable from a partial write.
 
 **Fix.** Establish whether the timeout is client-side and configurable. Either way the error should say whether anything was committed.
+
+---
+
 
 ---
 
@@ -270,3 +255,61 @@ means something different by it. `verbose: true` still returns the untouched
 entity.
 
 Tests in `test/response.test.js`.
+
+---
+
+## 9. `create_article` rejected every call that omitted `template` — *upstream: yes*
+
+**Symptom.** Found 2026-08-16 while probing issue 8: a create with only `title`
+and `world_id` — exactly what the schema said was required — returned a **422
+carrying a PHP stack trace**, `missing required field 'templateType'`.
+
+**Why it matters.** The tool advertised `template` as optional and the API
+treats it as mandatory, so the documented minimal call could never work. It had
+not been noticed because every real caller happened to pass a template.
+
+**Status — fixed 2026-08-16.** `template` is now in the schema's `required`
+list, and the handler refuses the call before it reaches the network so the
+failure reads as a sentence rather than a stack trace. Marking it required
+rather than defaulting to `"article"` was deliberate: a template cannot be
+changed later without losing template-specific fields, so a silent default
+would quietly commit the caller to the wrong one.
+
+---
+
+## Blocked on an application key
+
+**Status: requested, not yet issued (as of 2026-08-16).** The server currently
+runs in proxy mode — `WA_AUTH_TOKEN` only, with the shared public proxy
+injecting its own application key. Setting `WA_APP_KEY` switches to direct mode
+against `www.worldanvil.com`. Three things are waiting on that.
+
+**1. The `list_blocks` 403.** `/world/blocks` returns `403 access_denied` on
+every call tested, while `/world/articles`, `/world/categories` and
+`/world/blockfolders` all work on the same world with the same token. That
+pattern fits an *application*-scoped permission rather than an account tier —
+in which case the shared proxy's app key lacks a scope our own key might carry.
+
+```bash
+WA_APP_KEY=<key> WA_AUTH_TOKEN=<token> node -e "…listBlocks(SANDBOX)…"
+```
+
+If it succeeds, remove the 403 translation added in `api-client.js` and
+`list_blocks` becomes genuinely useful. If it still 403s, the endpoint is not
+available to this account at all and should be removed rather than explained.
+
+**2. 86 integration tests that have never run here.** `test/api.test.js` (75
+cases) and `test/timeline.test.js` (38 cases) both gate on
+`WA_AUTH_TOKEN && WA_APP_KEY` and skip wholesale without both. Requiring the
+key was deliberate — commit `d9bee80`, *"require both credentials for
+integration tests to avoid proxy flakiness"* — so this is not a bug to fix by
+loosening the gate. It does mean every fix in this file has been verified by
+hand-written probes rather than by the suite that exists for the purpose.
+
+**3. Issue 7, the 30-second timeout.** Direct mode removes the proxy hop
+entirely, which is the cleanest way to establish whether the timeout is
+client-side, proxy-side, or World Anvil's. Investigate that one *after* the key
+arrives rather than before.
+
+---
+
