@@ -65,23 +65,47 @@ describe("article references", () => {
     expect(data.articlePrevious).toBe(A);
   });
 
-  // The corruption this issue is really about.
-  it("refuses an { id } object, which would be stored as \"Array\"", async () => {
-    const result = await handleToolCall(
+  // The published OpenAPI schema documents { id } for articleNext, but the
+  // live API coerces that to the literal text "Array". Callers who follow the
+  // documentation must still succeed, so the object is unwrapped to the string
+  // form — which is correct for every writable field.
+  it("unwraps the documented { id } object to a bare UUID", async () => {
+    await handleToolCall(
       "worldanvil_update_article",
       { article_id: "a1", references: { articleNext: { id: B } } },
       client,
     );
 
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain("Array");
-    expect(client.updateArticle).not.toHaveBeenCalled();
+    const [, data] = client.updateArticle.mock.calls[0];
+    expect(data.articleNext).toBe(B);
   });
 
-  it("refuses an array of objects", async () => {
+  it("unwraps an array of { id } objects", async () => {
+    await handleToolCall(
+      "worldanvil_update_article",
+      { article_id: "a1", references: { relatedReports: [{ id: A }, { id: B }] } },
+      client,
+    );
+
+    const [, data] = client.updateArticle.mock.calls[0];
+    expect(data.relatedReports).toBe(`${A},${B}`);
+  });
+
+  it("accepts strings and { id } objects mixed in one array", async () => {
+    await handleToolCall(
+      "worldanvil_update_article",
+      { article_id: "a1", references: { relatedReports: [A, { id: B }] } },
+      client,
+    );
+
+    const [, data] = client.updateArticle.mock.calls[0];
+    expect(data.relatedReports).toBe(`${A},${B}`);
+  });
+
+  it("still refuses a value that is neither shape", async () => {
     const result = await handleToolCall(
       "worldanvil_update_article",
-      { article_id: "a1", references: { relatedReports: [{ id: A }] } },
+      { article_id: "a1", references: { articleNext: { uuid: B } } },
       client,
     );
 
@@ -159,7 +183,7 @@ describe("references tool schema", () => {
     }
   });
 
-  it("warns against the object shape in its description", () => {
+  it("documents the Array coercion the normalisation works around", () => {
     const tool = getToolDefinitions().find(
       (t) => t.name === "worldanvil_update_article",
     );

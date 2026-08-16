@@ -114,12 +114,15 @@ would commit the caller to the wrong one. ISSUES.md #9.
 
 **Files:** `src/handlers.js` · `src/tools.js` · `test/references.test.js`
 
-Reference fields are scalar string columns holding article UUIDs, comma-joined
-for multiples — not nested `{ id }` entities. An object or array is coerced by
-World Anvil to the literal text "Array" and reported as success. A new
-`references` parameter on both article write tools takes UUID strings or
-arrays, joins them, skips Markdown conversion, and refuses the shapes that
-corrupt; `fields` refuses object values for the same reason.
+Reference fields are stored as scalar strings holding article UUIDs,
+comma-joined for multiples. The vendor OpenAPI spec documents the write shape
+as a nested `{ id }` object, which `articleParent` honours but `articleNext`
+and `articlePrevious` coerce to the literal text "Array" while reporting
+success. A new `references` parameter on both article write tools accepts
+either shape plus arrays of either, normalises everything to the string form
+that works, and skips Markdown conversion — so a caller following the official
+documentation succeeds. `fields` refuses object values, which hit the coercion
+unmediated.
 
 Six fields World Anvil accepts and silently discards — `primarygeographicLocation`,
 `secondarygeographicLocation`, `species`, `ethnicity`, `currentLocation`,
@@ -140,7 +143,21 @@ driving the server against a live world.
 IDs. ISSUES.md marks per-issue which findings are worth reporting upstream
 independently of this fork.
 
-## 8. Recorded test fixture
+## 8. Vendor spec, for reference
+
+The Swagger UI at `worldanvil.com/api/external/boromir/swagger-documentation`
+renders client-side; the spec itself is at
+`wa-cdn.nyc3.cdn.digitaloceanspaces.com/assets/prod/boromir-documentation/swagger/openapi.yml`,
+with `$ref`s to sibling `parts/` files. Worth reading before probing.
+
+It independently confirms three things this fork relies on: there is no
+`/world/blocks` endpoint (#3); `folderId` and `timeline` are `readOnly` (#4);
+`templateType` and `world` are required on create (#5). The per-template
+schemas are not published — `parts/article/schemas/report.yml` and friends
+return 403 — so template-specific fields still have to be established by
+probing.
+
+## 9. Recorded test fixture
 
 **File:** `test/fixtures/article-write-response.json`
 

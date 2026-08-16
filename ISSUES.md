@@ -205,22 +205,23 @@ Original note: `ethnicity` and `species` on the Person template want a link to a
 **Status — implemented and verified against Sandbox on 2026-08-16, but the
 field list in this issue was partly wrong.**
 
-These are **scalar string columns holding article UUIDs**, comma-separated
-when a field takes several — not nested `{ id }` entities like `world` or
-`category`. Sending an object or an array makes World Anvil store the literal
-text **`"Array"`** (a PHP array-to-string coercion) and report success.
+These are stored as **scalar strings holding article UUIDs**, comma-separated
+when a field takes several. The published OpenAPI schema documents the write
+shape as a nested `{ id }` object — and for `articleParent` that works, but
+for `articleNext` and `articlePrevious` the live API coerces the object to
+the literal text **`"Array"`** and reports success. The plain string form is
+correct for every writable field tested.
 
-| shape sent | stored |
-|---|---|
-| `{ id: uuid }` | `"Array"` |
-| `[uuid1, uuid2]` | `"Array"` |
-| `"uuid1,uuid2"` | correct |
-| `"uuid"` | correct |
+| shape sent | `articleParent` | `articleNext` |
+|---|---|---|
+| `{ id: uuid }` (as documented) | correct | `"Array"` |
+| `"uuid"` | correct | correct |
 
-A new `references` parameter on `create_article` and `update_article` takes
-UUID strings or arrays of them, joins arrays itself, skips Markdown conversion,
-and refuses the object shape. `fields` now also refuses object values, which
-hit the same coercion.
+A new `references` parameter on `create_article` and `update_article` accepts
+either shape — bare UUID or the documented `{ id }` — plus arrays of either,
+and normalises everything to the string form the API actually stores, joining
+arrays with commas. A caller following the official documentation therefore
+succeeds. `fields` refuses object values, which hit the coercion unmediated.
 
 **Which of the six named fields are real:**
 
@@ -252,6 +253,13 @@ rather than passed through to report a write that did not happen.
 Session 4 → Session 5 with `articleNext`/`articlePrevious` and populating
 `relatedReports`. The location anchoring in the original complaint cannot be
 scripted, and that is World Anvil's limit rather than this server's.
+
+**Checked against the vendor OpenAPI spec** (linked from the Swagger UI at
+`wa-cdn.../boromir-documentation/swagger/openapi.yml`). It confirms
+`timeline` is `readOnly`, and `templateType` and `world` are required on
+create. It does not publish the per-template schemas — `report.yml`,
+`person.yml` and friends return 403 — so the discarded fields above are not
+documented anywhere, and the empirical findings remain the only source.
 
 Tests in `test/references.test.js`.
 

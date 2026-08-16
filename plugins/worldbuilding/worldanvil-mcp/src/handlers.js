@@ -58,18 +58,38 @@ const INVERSE_REFERENCES = {
 };
 
 /**
+ * Reduce one reference value to the UUID string World Anvil actually stores.
+ *
+ * Accepts a bare UUID or the `{ id }` object the published OpenAPI schema
+ * describes, because callers reasonably follow the documentation — but always
+ * emits the string. The documented object shape is only honoured for some
+ * fields: `articleParent` accepts it, while `articleNext` and
+ * `articlePrevious` coerce it to the literal text "Array" and report success.
+ * The string form is correct for every writable field tested, so everything is
+ * normalised to it.
+ *
+ * @param {*} value - UUID string or { id }
+ * @returns {string|null} UUID, or null if the value is neither shape
+ */
+function referenceId(value) {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && typeof value.id === "string") {
+    return value.id;
+  }
+  return null;
+}
+
+/**
  * Build the entity-reference portion of an article payload.
  *
- * Reference fields — `articleNext`, `relatedReports`, `species`, and the rest —
- * are scalar string columns holding article UUIDs, comma-separated when a
- * field takes several. They are NOT nested `{ id }` entities like `world` or
- * `category`: sending an object or an array makes World Anvil store the
- * literal string "Array" and report success, which is unrecoverable without
- * noticing. Arrays are joined here so callers can pass the natural shape.
+ * Reference fields — `articleNext`, `articleParent`, `relatedReports` and the
+ * rest — are stored as scalar strings holding article UUIDs, comma-separated
+ * when a field takes several. Arrays are joined here so callers can pass the
+ * natural shape.
  *
  * Values are never Markdown-converted — they are identifiers, not prose.
  *
- * @param {Object} references - fieldName -> UUID string, or array of UUIDs
+ * @param {Object} references - fieldName -> UUID, { id }, or an array of either
  * @returns {Object} Payload fragment ready to merge
  */
 function buildReferences(references) {
@@ -92,22 +112,16 @@ function buildReferences(references) {
       );
     }
 
-    if (typeof value === "string") {
-      data[field] = value;
-      continue;
+    const values = (Array.isArray(value) ? value : [value]).map(referenceId);
+
+    if (values.some((v) => v === null)) {
+      throw new Error(
+        `references.${field} must be an article UUID string, a { id: "uuid" } ` +
+          `object, or an array of either.`,
+      );
     }
 
-    if (Array.isArray(value) && value.every((v) => typeof v === "string")) {
-      data[field] = value.join(",");
-      continue;
-    }
-
-    throw new Error(
-      `references.${field} must be an article UUID string, or an array of ` +
-        `them. World Anvil stores these as plain strings — an object such as ` +
-        `{ id: "..." } is coerced to the literal text "Array" and reported as ` +
-        `success.`,
-    );
+    data[field] = values.join(",");
   }
 
   return data;
