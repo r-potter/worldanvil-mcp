@@ -95,10 +95,24 @@ Recorded fixtures live in `test/fixtures/`. `article-write-response.json` is a r
 
 **Markdown→BBCode**: Article `content` fields and other text fields are automatically converted via `markdownToBBCode()` in `utils.js`. The function is called in handlers before sending to the API. WorldAnvil does not render Markdown natively.
 
-**Known API quirks** (discovered through testing, documented in `api-client.js`):
+**Known API quirks** — see **[API-QUIRKS.md](API-QUIRKS.md)** for the full record
+of where the live API differs from its own OpenAPI spec. Read it before adding
+a field or an endpoint; most of it was found the expensive way.
+
+The rule that governs the rest: **the API ignores keys it does not recognise
+and returns `success: true`.** A successful write is not evidence that anything
+was written. Misspell a field, use one from another template, or send the wrong
+shape, and you get a cheerful success and no change.
+
+Quick hits:
 - Swagger shows `/variable_collection` but the live API uses `/variablecollection`
 - Variable creation requires nested `{ id: ... }` objects despite Swagger showing flat fields
 - List endpoints use `POST` with a body (not `GET` with query params)
+- Entity references (`articleNext` and friends) are the *opposite*: plain UUID
+  strings, comma-separated for multiples — an object becomes the literal `"Array"`
+- Space calls ~750ms apart; Cloudflare returns 429 otherwise
+
+Fetch the vendor spec locally with `npm run fetch-spec` (gitignored, not committed).
 - Rate limiting: space API calls ~750ms apart to avoid Cloudflare 429s
 
 ## Cloudflare Worker Proxy

@@ -134,10 +134,17 @@ That also explains ISSUES.md #3b: they were never a string-vs-object problem.
 
 ## 7. Local documentation
 
-**Files:** `CLAUDE.md` (`## Testing`, `## The Auth Token`) · `ISSUES.md`
+**Files:** `CLAUDE.md` (`## Testing`, `## The Auth Token`) · `ISSUES.md` ·
+`API-QUIRKS.md` · `scripts/fetch-spec.mjs`
 
-The Sandbox / Fallen London testing rules, and the backlog of defects found
-driving the server against a live world.
+The Sandbox / Fallen London testing rules, the backlog of defects found driving
+the server against a live world, and a record of where the live API differs
+from its own OpenAPI spec.
+
+`API-QUIRKS.md` is the one worth reading first when something new misbehaves.
+The recurring cause of everything in ISSUES.md is that the API ignores keys it
+does not recognise and returns `success: true`, so a successful write is not
+evidence that anything was written.
 
 **Upstream-worthy: no.** Contains this account's world IDs and subscriber group
 IDs. ISSUES.md marks per-issue which findings are worth reporting upstream
@@ -148,7 +155,15 @@ independently of this fork.
 The Swagger UI at `worldanvil.com/api/external/boromir/swagger-documentation`
 renders client-side; the spec itself is at
 `wa-cdn.nyc3.cdn.digitaloceanspaces.com/assets/prod/boromir-documentation/swagger/openapi.yml`,
-with `$ref`s to sibling `parts/` files. Worth reading before probing.
+with `$ref`s to sibling `parts/` files. Pull the whole tree (191 files) with
+`npm run fetch-spec`.
+
+**The spec itself is deliberately not committed.** Its licence is silent on
+redistribution — it restricts commercial use of the API and says nothing
+about the schema files — and this package publishes to npm, so vendoring it
+is a decision to take deliberately rather than by default. A stale copy also
+invites trusting it over live behaviour, which is exactly the mistake it
+causes: see API-QUIRKS.md for where it is wrong.
 
 It independently confirms three things this fork relies on: there is no
 `/world/blocks` endpoint (#3); `folderId` and `timeline` are `readOnly` (#4);

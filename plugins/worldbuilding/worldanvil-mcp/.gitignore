@@ -23,3 +23,6 @@ coverage/
 *.log
 npm-debug.log*
 /node_modules
+
+# Vendor OpenAPI spec, fetched on demand (npm run fetch-spec)
+spec/

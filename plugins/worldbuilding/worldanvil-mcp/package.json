@@ -12,7 +12,8 @@
     "dev": "node --watch index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "fetch-spec": "node scripts/fetch-spec.mjs"
   },
   "keywords": [
     "mcp",

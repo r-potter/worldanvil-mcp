@@ -8,6 +8,8 @@ Defects found driving `worldanvil-mcp@1.12.0` against a live World Anvil world, 
 
 Fixes that have actually landed are catalogued in [UPSTREAM.md](UPSTREAM.md), alongside the local decisions a future merge from upstream must not undo.
 
+[API-QUIRKS.md](API-QUIRKS.md) records where the live API differs from its own OpenAPI spec — read it before diagnosing anything new, because the recurring cause of the defects below is that the API ignores unrecognised keys and returns `success: true`.
+
 ---
 
 ## 1. Response payloads are enormous — *upstream: probably, behind a flag*
