@@ -1251,7 +1251,7 @@ export function getToolDefinitions() {
     {
       name: "worldanvil_list_blocks",
       description:
-        "List all blocks in a world, paginated. Usually the only way to enumerate blocks — worldanvil_list_blocks_in_folder sees only blocks filed into a BlockFolder, which excludes anything filed in the web editor. The endpoint is undocumented and returns 403 on some worlds; if it does, fall back to listing block folders and then their blocks.",
+        "List all blocks in a world, paginated. The only way to confirm a block actually belongs to a world — nothing on the block itself reports its world, and worldanvil_list_blocks_in_folder sees only blocks put in a BlockFolder, which is a different relation. Undocumented, and returns 403 on a private world, where block membership therefore cannot be checked at all.",
       inputSchema: {
         type: "object",
         properties: {
@@ -1278,10 +1278,15 @@ export function getToolDefinitions() {
     {
       name: "worldanvil_create_block",
       description:
-        "Create a new statblock/content block. Requires a BlockTemplate ID (templates define the block structure).",
+        "Create a new statblock/content block in a world. Requires a BlockTemplate ID (templates define the block structure) and a world — a block created without one is orphaned: it reads back perfectly and exists in no world, and no field on the block reports the association, so only worldanvil_list_blocks can confirm it landed.",
       inputSchema: {
         type: "object",
         properties: {
+          world_id: {
+            type: "string",
+            description:
+              "World the block belongs to. Required: without it the block is created against the account and joins no world, reporting success either way.",
+          },
           title: { type: "string" },
           template_id: {
             type: "number",
@@ -1315,7 +1320,7 @@ export function getToolDefinitions() {
               "Optional payload for blocks whose dataParser is 'json'. Sent verbatim; an object is serialised for you.",
           },
         },
-        required: ["title", "template_id"],
+        required: ["title", "template_id", "world_id"],
       },
     },
     {
@@ -1327,6 +1332,11 @@ export function getToolDefinitions() {
         properties: {
           block_id: { type: "string", description: "Block ID" },
           title: { type: "string", description: "New block title" },
+          world_id: {
+            type: "string",
+            description:
+              "Move the block into a world, or adopt an orphaned one created before this was required. Nothing on the block reports its world, so check the result with worldanvil_list_blocks rather than by reading the block back.",
+          },
           folder_id: {
             type: ["number", "string"],
             description:

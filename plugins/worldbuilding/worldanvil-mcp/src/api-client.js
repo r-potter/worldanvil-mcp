@@ -588,12 +588,11 @@ export class WorldAnvilClient {
    * only blocks associated with a BlockFolder, and blocks filed in the web
    * editor are not.
    *
-   * It is world-dependent. Verified 2026-08-16 with one token: 137 blocks
-   * across three pages on one world, `403 access_denied` on another. Which
-   * property of a world decides that is unknown — both worlds have an RPG
-   * system set, and the denial does not depend on whether any block exists.
-   * The 403 is translated rather than passed through, because the fallback is
-   * not obvious and is not equivalent.
+   * **A private world returns 403.** Established 2026-08-16 by flipping a
+   * private world public and back: the same call, same token, 403 before and a
+   * listing after. So on a private world there is no way to enumerate blocks
+   * at all — and since a block's world association appears on no field of the
+   * block, no way to confirm one landed either.
    */
   async listBlocks(worldId, options = {}) {
     const body = {
@@ -605,12 +604,12 @@ export class WorldAnvilClient {
     } catch (error) {
       if (!/\(40[13]\)/.test(error.message)) throw error;
       throw new Error(
-        `${error.message} — /world/blocks is undocumented and is denied on ` +
-          `some worlds while working on others; nothing about the request is ` +
-          `wrong. Fall back to list_blockfolders and list_blocks_in_folder, ` +
-          `but note that only covers blocks associated with a BlockFolder: ` +
-          `blocks filed in the web editor carry a UUID \`folderId\` instead ` +
-          `and will not appear.`,
+        `${error.message} — /world/blocks is denied on a private world; ` +
+          `nothing about the request is wrong. There is no equivalent ` +
+          `fallback: list_blockfolders and list_blocks_in_folder see only ` +
+          `blocks associated with a BlockFolder, which is not what puts a ` +
+          `block in a world. On a private world, a block's world membership ` +
+          `cannot be checked through the API at all.`,
       );
     }
   }

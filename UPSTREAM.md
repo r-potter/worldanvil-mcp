@@ -98,6 +98,30 @@ write response echoes the array back.
 
 **Upstream-worthy: yes**, unreservedly — the same class of defect as 3a.
 
+## 3c. `create_block` requires a world
+
+**Files:** `src/handlers.js` · `src/tools.js` · `src/api-client.js` ·
+`test/blocks.test.js`
+
+`create_block` never sent a world, so every block this server has ever made was
+created against the account and joined no world — present in `get_block`,
+absent from World Anvil. The field is `world: { id }`, honoured on create and
+update; `world: "uuid"`, `worldId` and `world_id` are all accepted and ignored.
+
+`world_id` is required on `create_block` and refused before the network, on the
+same reasoning as the `template` fix: **the failure is undetectable after the
+fact.** The association appears on no field of the block at any granularity, so
+reading the write back — the check this fork recommends everywhere else — cannot
+see it. `update_block` takes `world_id` too, which adopts an already-orphaned
+block rather than forcing a recreate.
+
+Relatedly, `/world/blocks` returns 403 on a **private** world, which is why the
+earlier notes called it unavailable. On a private world a block's world
+membership therefore cannot be checked at all.
+
+**Upstream-worthy: yes**, unreservedly, and it is the most valuable of the
+block fixes — ISSUES.md #12.
+
 ## 4. One answer for an article's category
 
 **Files:** `src/response.js` · `src/handlers.js` · `test/response.test.js`

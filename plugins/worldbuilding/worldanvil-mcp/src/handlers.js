@@ -832,9 +832,27 @@ export async function handleToolCall(name, args, client) {
         );
 
       case "worldanvil_create_block": {
+        // Without a world the block belongs to nobody. It still reads back
+        // perfectly from get_block — correct payload, tags, template, folder —
+        // while being absent from the world entirely, so the read-back check
+        // this server recommends everywhere else does not catch it. Required
+        // rather than defaulted for that reason: see ISSUES.md #12.
+        if (!args.world_id) {
+          throw new Error(
+            "world_id is required. A block created without one is orphaned: " +
+              "it reads back correctly from worldanvil_get_block and appears " +
+              "in no world. The association is write-only — no field on the " +
+              "block reports it — so worldanvil_list_blocks on the world is " +
+              "the only way to confirm a block landed.",
+          );
+        }
+
         const data = {
           title: args.title,
           template: { id: args.template_id }, // Requires a valid BlockTemplate ID
+          // Must be the `{ id }` object. `world: "uuid"`, `worldId` and
+          // `world_id` are all accepted and silently ignored.
+          world: { id: args.world_id },
         };
         // The field is `blockfolder`, not `folder` as the spec has it. Sending
         // `folder` returns success and leaves the block unfiled. See
@@ -888,10 +906,14 @@ export async function handleToolCall(name, args, client) {
 
         if (args.tags !== undefined) data.tags = blockTags(args.tags);
 
+        // Adopts an orphaned block into a world, which is how a block created
+        // before `world_id` was required gets rescued without recreating it.
+        if (args.world_id !== undefined) data.world = { id: args.world_id };
+
         if (Object.keys(data).length === 0) {
           throw new Error(
-            "Nothing to update: pass `title`, `tags`, `folder_id`, or one of " +
-              "`textualdata`, `tabulardata`, `jsondata`.",
+            "Nothing to update: pass `title`, `tags`, `folder_id`, " +
+              "`world_id`, or one of `textualdata`, `tabulardata`, `jsondata`.",
           );
         }
 

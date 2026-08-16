@@ -16,6 +16,7 @@ import { markdownToBBCode } from "../src/utils.js";
 import { WorldAnvilClient } from "../src/api-client.js";
 
 const YAML = "merit_name: Danger Sense\nmerit_dots: '2'";
+const WORLD = "f5deaaa1-6464-44dc-821a-e12cb8563692"; // Sandbox
 
 describe("worldanvil_update_block", () => {
   let client;
@@ -127,7 +128,7 @@ describe("worldanvil_create_block", () => {
   it("sends a payload supplied at creation time", async () => {
     await handleToolCall(
       "worldanvil_create_block",
-      { title: "Danger Sense", template_id: 19552, textualdata: YAML },
+      { title: "Danger Sense", template_id: 19552, world_id: WORLD, textualdata: YAML },
       client,
     );
 
@@ -140,12 +141,64 @@ describe("worldanvil_create_block", () => {
   it("still works with no payload", async () => {
     await handleToolCall(
       "worldanvil_create_block",
-      { title: "Empty", template_id: 19552 },
+      { title: "Empty", template_id: 19552, world_id: WORLD },
       client,
     );
 
     const [data] = client.createBlock.mock.calls[0];
     expect(data).not.toHaveProperty("textualdata");
+  });
+});
+
+// ISSUES.md #12: a block created without a world reads back perfectly and
+// exists in no world. Nothing on the entity reports the association, so the
+// read-back check that catches every other silent write here does not catch
+// this one — hence a refusal before the network rather than a default.
+describe("block world association", () => {
+  let client;
+
+  beforeEach(() => {
+    client = {
+      createBlock: vi.fn(async () => ({ success: true, id: 1 })),
+      updateBlock: vi.fn(async () => ({ success: true, id: 1 })),
+    };
+  });
+
+  it("sends the world as the { id } object the API honours", async () => {
+    await handleToolCall(
+      "worldanvil_create_block",
+      { title: "Discern Composition", template_id: 19719, world_id: WORLD },
+      client,
+    );
+
+    const [data] = client.createBlock.mock.calls[0];
+    expect(data.world).toEqual({ id: WORLD });
+    // `world: "uuid"`, `worldId` and `world_id` are all accepted and ignored.
+    expect(data).not.toHaveProperty("worldId");
+    expect(data).not.toHaveProperty("world_id");
+  });
+
+  it("refuses to create an orphan", async () => {
+    const result = await handleToolCall(
+      "worldanvil_create_block",
+      { title: "Discern Composition", template_id: 19719 },
+      client,
+    );
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("world_id");
+    expect(client.createBlock).not.toHaveBeenCalled();
+  });
+
+  it("adopts an existing orphan into a world", async () => {
+    await handleToolCall(
+      "worldanvil_update_block",
+      { block_id: "1687174", world_id: WORLD },
+      client,
+    );
+
+    const [, data] = client.updateBlock.mock.calls[0];
+    expect(data.world).toEqual({ id: WORLD });
   });
 });
 
@@ -167,7 +220,7 @@ describe("block folder filing", () => {
   it("files a new block using the blockfolder key", async () => {
     await handleToolCall(
       "worldanvil_create_block",
-      { title: "Merit", template_id: 19552, folder_id: 42873 },
+      { title: "Merit", template_id: 19552, world_id: WORLD, folder_id: 42873 },
       client,
     );
 
@@ -186,6 +239,7 @@ describe("block folder filing", () => {
       {
         title: "Discern Composition",
         template_id: 19552,
+        world_id: WORLD,
         folder_id: "93837178-ac6f-4217-b826-6f66250cfc4b",
       },
       client,
@@ -234,7 +288,7 @@ describe("block folder filing", () => {
   it("omits the folder entirely when none is given", async () => {
     await handleToolCall(
       "worldanvil_create_block",
-      { title: "Merit", template_id: 19552 },
+      { title: "Merit", template_id: 19552, world_id: WORLD },
       client,
     );
 
@@ -270,7 +324,7 @@ describe("block tags", () => {
   it("sets tags on create", async () => {
     await handleToolCall(
       "worldanvil_create_block",
-      { title: "Spell", template_id: 19552, tags: "spell-matter-1" },
+      { title: "Spell", template_id: 19552, world_id: WORLD, tags: "spell-matter-1" },
       client,
     );
 

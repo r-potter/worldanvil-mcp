@@ -29,7 +29,8 @@ see `UPSTREAM.md`.
 | 6 | Block `folderId` | `readOnly` | Writable. Accepts a UUID and persists it — the only way to file a block into a web-editor folder |
 | 7 | Block folder on write | `folder: { id }` | Ignored. The field is `blockfolder: { id }`, and its id is a BlockFolder integer — a UUID there returns a **500 HTML page** |
 | 8 | Block `RPGSRD` | required on create | Ignored; the block inherits its template's system |
-| 9 | `/world/blocks` | absent from the spec | Exists and works — but is denied on some worlds. See below |
+| 9 | `/world/blocks` | absent from the spec | Exists and works on a public world; `403 access_denied` on a private one |
+| 10 | Block `world` | absent — a Block has no `world` field | `world: { id }` on create/update is what puts a block in a world. Omit it and the block is created against the account, in no world, reporting success. `world: "uuid"`, `worldId` and `world_id` are all ignored |
 
 Multi-valued reference fields take a **comma-separated string**, not an array.
 An array is coerced to `"Array"` exactly as an object is.
@@ -41,7 +42,7 @@ that reading the spec would have caught.
 
 | Behaviour | Where |
 |---|---|
-| A Block has no `world` field at all, only `author`, `blockfolder` and `folderId` | `schemas/block.yml` |
+| A Block *reads back* no `world` field at all, only `author`, `blockfolder` and `folderId` — but it is writable, and a block without one belongs to no world | `schemas/block.yml`, and quirk 10 above |
 | `category: "-1"` on `/world/articles` means *uncategorised*, not *unfiltered*. Omit the key to list everything | `world-articles.yml` description |
 | `templateType` and `world` are **required** on article create | `ArticleGenericCreate.required` |
 | `folderId` and `timeline` are `readOnly` | `schemas/article.yml` |
@@ -102,13 +103,19 @@ publishes. `state` is also exposed outright on `create`/`update` for `marker`,
 
 See ISSUES.md #4. Treat any agent-driven write as capable of publishing.
 
+## The one that cannot be caught by reading the write back
+
+A block's world membership appears on **no field of the block, at any
+granularity**: an orphan and a block genuinely in a world are structurally
+identical. `/world/blocks` is the only witness — and it is denied on a private
+world, so on a private world the association cannot be verified at all.
+
+This is the exception to the rule at the top of this file. Everywhere else,
+reading the entity back catches the silent write. Here it cannot, which is why
+`world_id` is required rather than defaulted. See ISSUES.md #12.
+
 ## Still open
 
-- **`/world/blocks` is denied on some worlds and not others.** One token, proxy
-  mode, same afternoon: 137 blocks on a public world, `403 access_denied` on a
-  private one. Not the RPG system (both have one) and not emptiness (the private
-  world still 403d once it held blocks). It is the only route that enumerates
-  blocks filed in the web editor, so the fallback is not equivalent.
 - **Whether a written `folderId` files a block where the web editor shows it**
   is unverified — nothing reads the UUID back except the block. Check the first
   one by eye.

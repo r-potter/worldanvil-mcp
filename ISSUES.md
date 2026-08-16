@@ -501,34 +501,43 @@ is blocked on this, and only on this.**
 turns out to be. Both want verifying against a world with pre-existing folders,
 not only against freshly created ones.
 
-**Status — fixed and verified against Sandbox on 2026-08-16.** Both fields are
-reachable now. The framing above was right that something was missing and wrong
-about what: it is not that Sandbox's folders are numeric and Fallen London's are
-UUIDs, but that **a Block has two unrelated folder fields and the two worlds use
-different ones**.
+**Status — both landed 2026-08-16, and doing so uncovered a worse defect
+underneath. See issue 12; the import is still blocked.**
 
-| field | id | who sets it | enumerable by |
-|---|---|---|---|
-| `blockfolder` | integer (`42875`) | `create_blockfolder`, i.e. this server | `list_blocks_in_folder` |
-| `folderId` | UUID (`93837178-…`) | the web editor | nothing |
+`tags` is now exposed on `create_block` and `update_block`, and `folder_id`
+accepts `["number", "string"]`. Both verified on block `1687174`, which came back
+`tags: "spell-matter-1"` and `folderId: "93837178-…"`. A metadata-only update
+does **not** clobber the payload — `textualdata` returned unchanged, `blockId`
+and all — so tags and filing can safely be a second pass rather than part of the
+create.
 
-They do not track each other. A block filed correctly into BlockFolder 42875
-reads back `blockfolder: { id: 42875 }` and **`folderId: "-1"` regardless** —
-so 11's *"`folderId` `-1` (world root)"* was not evidence the block landed
-unfiled, exactly the misreading issue 8 describes for articles. Conversely
-Fallen London's blocks read `blockfolder: null` with a UUID `folderId`, which is
-why `list_blockfolders` returns `[]` there: the world has no BlockFolders at
-all, only web-editor folders.
+**The two folder systems are the real finding, and the schemas now say so.** An
+INTEGER is a BlockFolder — creatable and listable through the blockfolder tools,
+and the only kind `list_blocks_in_folder` can enumerate. A UUID is the
+web-editor folder a block reports as `folderId`; it **resolves through no
+endpoint** but is writable. So the earlier 404s from `get_blockfolder` and
+`list_blocks_in_folder` on `93837178-…` were correct behaviour against the wrong
+namespace, not defects, and `list_blockfolders` returning `[]` on Fallen London
+is right too — that world has no integer BlockFolders at all.
 
-**The UUID is writable, and that is what unblocks the import.** `folderId` is
-marked `readOnly` in the vendor spec and is not — it accepts a UUID and persists
-it. That is the only way to file a block alongside ones made in the web editor.
-The UUID resolves through no endpoint tested (`/blockfolder`, `/category` and
-`/article` all 404), and sending it as `blockfolder: { id }` returns a **500
-carrying an HTML page**, so the two systems cannot be conflated.
+**But `folderId` is inert as an association**, which is what issue 12 turns on.
+Setting it to the Spells folder did not make the block appear in the world.
 
-`folder_id` is therefore typed `["number", "string"]` and routed by shape:
-integer → `blockfolder`, UUID → `folderId`, anything else refused by name.
+**`list_blocks` still does not 403 here**, contradicting the note under *Blocked
+on an application key*: `/world/blocks` answered normally against Fallen London
+in proxy mode across three pages. With `list_blockfolders` empty, it is the only
+way to enumerate this world's blocks — the inverse of the guidance in 3a.
+
+*Resolved under issue 12: the 403 is the private world state. Fallen London is
+public and answers; Sandbox is private and does not.*
+
+#### Detail worth keeping
+
+`folder_id` is typed `["number", "string"]` and routed by shape — integer →
+`blockfolder`, UUID → `folderId`, anything else refused by name. A UUID sent as
+`blockfolder: { id }` returns a **500 carrying an HTML page**, so the two
+systems cannot be conflated by accident. `folderId` is marked `readOnly` in the
+vendor spec and is not.
 
 **`tags` is a comma-separated string**, and an array becomes the literal
 `"Array"` — the `articleNext` coercion from issue 6, one field further on. Worse
@@ -536,29 +545,10 @@ here: the write response **echoes back the array you sent** while the stored
 value is `"Array"`, so nothing looks wrong until the block is read again. Arrays
 are joined client-side; both shapes work.
 
-**`list_blocks` is world-dependent, not key-dependent.** With one token, in
-proxy mode, on the same afternoon: 137 blocks on Fallen London, `403
-access_denied` on Sandbox. Not explained by either obvious candidate — both
-worlds have an RPG system set, and Sandbox still 403d after blocks existed in
-it. So the note under *Blocked on an application key* overstates its case: the
-endpoint plainly works, and an app key may not be what stands between Sandbox
-and a listing. The 403 message no longer claims otherwise, and no longer
-recommends the folder walk without qualification — that walk sees only
-BlockFolder-filed blocks, so on Fallen London it would report zero.
-
-**Two more silent-ignore instances, found in passing and not acted on:**
+**Two silent-ignore instances found in passing, neither acted on:**
 `RPGSRD: { id }` on create is discarded (the block inherits its template's
 system) even though the spec marks it required; and **blocks are created
-`state: "public"`**, which belongs with issue 4 rather than here.
-
-**One thing left to verify by eye, and it cannot be done through the API.**
-Persisting `folderId` is confirmed; whether the web editor then *shows* the
-block in that folder is not, because nothing reads the UUID back except the
-block itself. The evidence is circumstantial but strong — all 29 spell blocks
-share one UUID, the merits another. **Import one spell first and look at it in
-the editor** before running the remaining 266.
-
-Tests in `test/blocks.test.js`.
+`state: "public"`**, which belongs with issue 4.
 
 **Carry into the import: page references are `MtAw p. 123`, spaced.** APA style,
 and the settled convention. The vault JSON is already normalised to it — all 72
@@ -572,6 +562,95 @@ the inconsistency resolves itself as a side effect. Just do not introduce a
 
 ---
 
+## 12. Blocks are created orphaned — `create_block` takes no world — *upstream: yes*
+
+**Symptom.** Found 2026-08-16, immediately after issue 11 was fixed: a block
+created through the server is **invisible in the World Anvil web UI**, and absent
+from `list_blocks` for the world it was supposed to join.
+
+**Detail.** Block `1687174` (*Discern Composition*) reads back perfectly from
+`get_block` — correct `textualdata`, `tags: spell-matter-1`,
+`folderId: 93837178-…`, right template, right RPGSRD, sensible auto-generated
+`identifier`. It is nonetheless not in Fallen London. `list_blocks` on that world
+returns the same 137 blocks it held before the create, and the alphabetical
+sequence runs `Destiny → Discorporate → Divination` with no `Discern
+Composition` between Destiny and Discorporate, where it sorts.
+
+**Cause.** `create_block` has **no `world_id` parameter**, unlike
+`create_article`, which requires one. The block is created against the
+authenticated account and never associated with a world. Nothing in either
+response hints at it: create and update both returned `success: true` with a
+complete, plausible entity.
+
+**`folderId` does not substitute for the association.** Filing the block into the
+world's own Spells folder UUID left it just as invisible, so `folderId` is a
+stored string on the block rather than a link. The world→blocks relation is
+something else and is not exposed on the block at all. Note the `world:` key
+inside every existing spell block's *payload* is inert template data, not an
+association — an easy thing to mistake for one.
+
+**Why it matters.** This is the worst-shaped failure in this file. A bulk import
+today would create 267 blocks that report success, **verify clean on read-back**,
+and exist nowhere the world can see them. Read-back verification — the technique
+every other issue here recommends — does not catch it. Only enumerating the world
+does.
+
+**Fix.** Add `world_id` to `create_block`. Establish first whether the API takes
+it as a create-time field or needs a separate association call, and whether
+`update_block` can adopt an already-orphaned block into a world — that decides
+whether `1687174` can be salvaged or should be deleted and recreated. Until then
+`1687174` is orphaned and is the only block in this state.
+
+**The bulk import of 267 spell blocks is blocked on this.**
+
+**Status — fixed and verified against Sandbox on 2026-08-16. The diagnosis above
+is correct in every particular.** The association is
+**`world: { id: "<uuid>" }`**, honoured on create *and* on update, and it was
+simply never sent.
+
+| shape | result |
+|---|---|
+| `world: { id: uuid }` | **works**, on `PUT` and `PATCH` alike |
+| `world: "uuid"` | accepted, silently ignored |
+| `worldId` / `world_id` | accepted, silently ignored |
+
+`world_id` is now **required** on `create_block` and refused before the network,
+on the same reasoning as issue 9: the failure is undetectable after the fact, so
+a default would quietly commit the caller to the wrong answer. It is also
+exposed on `update_block`, which **adopts an orphan** — verified: a block created
+without a world was absent from the listing, then present after one `PATCH`. So
+**`1687174` is salvageable**; adopt it rather than recreating it.
+
+**Nothing else associates a block with a world.** Filing into a world-scoped
+BlockFolder does not — a block in BlockFolder 42876, whose `world` is Sandbox,
+stayed absent from the Sandbox listing. Nor does `folderId`, as this issue
+already found.
+
+**Why read-back cannot catch this, and what can.** The world association appears
+on **no field of the block at any granularity** — `-1`, `0`, `2` and `3` were
+all checked, and an orphan is byte-for-byte structurally identical to a block
+that is genuinely in a world. `list_blocks` on the world is the only witness.
+That inverts the standing advice in this file: for blocks, verify by
+enumerating the world, never by reading the entity back.
+
+### The 403 in issue 11 was the private world, and it matters here
+
+`/world/blocks` returns `403 access_denied` **because Sandbox is private**.
+Established by flipping Sandbox to public, re-running the same call, and
+flipping it straight back: 403 before, a listing after. Not the app key, not the
+RPG system, not emptiness.
+
+The consequence is worth stating plainly: **on a private world, this defect is
+undetectable.** The only witness to the association is denied, and the entity
+never carries it. Sandbox is private, so this could not have been caught there —
+it took a public world to see it, which is exactly the asymmetry
+[CLAUDE.md](CLAUDE.md#testing) warns about for `state`, arriving from a
+direction nobody had predicted.
+
+Tests in `test/blocks.test.js`.
+
+---
+
 ## Blocked on an application key
 
 **Status: requested, not yet issued (as of 2026-08-16).** The server currently
@@ -579,14 +658,10 @@ runs in proxy mode — `WA_AUTH_TOKEN` only, with the shared public proxy
 injecting its own application key. Setting `WA_APP_KEY` switches to direct mode
 against `www.worldanvil.com`. Three things are waiting on that.
 
-**1. The `list_blocks` 403.** `/world/blocks` returns `403 access_denied` on
-Sandbox, while `/world/articles`, `/world/categories` and `/world/blockfolders`
-all work on the same world with the same token.
-
-**Weakened by issue 11, 2026-08-16.** The same call, same token, same proxy
-mode, succeeds on Fallen London — 137 blocks across three pages. So this is
-*world*-scoped, not application-scoped, and an app key is no longer the obvious
-suspect. Worth one call when the key arrives, but expect it to change nothing.
+**1. ~~The `list_blocks` 403.~~ Closed 2026-08-16 — it was never about the key.**
+`/world/blocks` is denied on a **private** world and answers on a public one.
+Established under issue 12 by flipping Sandbox public, repeating the call, and
+flipping it back. Nothing to test when the key arrives.
 
 ```bash
 WA_APP_KEY=<key> WA_AUTH_TOKEN=<token> node -e "…listBlocks(SANDBOX)…"

@@ -112,6 +112,9 @@ Quick hits:
   strings, comma-separated for multiples — an object becomes the literal `"Array"`
 - A Block has *two* unrelated folder fields — integer `blockfolder` and UUID
   `folderId` — and each reads back empty in the other's world
+- `create_block` must send `world: { id }` or the block joins no world, and
+  **nothing on the block reports its world** — only `list_blocks` can, and that
+  is denied on a private world (so not in Sandbox)
 - Space calls ~750ms apart; Cloudflare returns 429 otherwise
 
 Fetch the vendor spec locally with `npm run fetch-spec` (gitignored, not committed).
