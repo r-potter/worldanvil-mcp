@@ -142,7 +142,7 @@ Tests in `test/list-articles.test.js`.
 > now translated into an error naming the working path: list folders, then list
 > blocks per folder. Whether the 403 is tier- or account-dependent, or whether
 > a direct `WA_APP_KEY` would succeed where the shared proxy key does not, is
-> untested — that is the obvious next probe.
+> untested — see *Blocked on an application key* below.
 >
 > Consistent with all of this, a Block has no `world` field at all; it carries
 > `author` and `blockfolder`.
@@ -154,6 +154,42 @@ Tests in `test/list-articles.test.js`.
 **3c. Wrong link prefixes resolve nowhere.** `@[Display](type:ID)` requires the prefix to match the target's entity class — `person:`, `organization:`, `article:`, `location:`. A mismatched prefix produces a link that looks correct and goes nowhere, with no error. Known entity classes should be validated, and an unknown or mismatched one should raise.
 
 **Fix.** All three should error rather than succeed quietly. A caller writing correct-looking code against a success response will not find out for a long time.
+
+---
+
+## Blocked on an application key
+
+**Status: requested, not yet issued (as of 2026-08-16).** The server currently
+runs in proxy mode — `WA_AUTH_TOKEN` only, with the shared public proxy
+injecting its own application key. Setting `WA_APP_KEY` switches to direct mode
+against `www.worldanvil.com`. Three things are waiting on that.
+
+**1. The `list_blocks` 403.** `/world/blocks` returns `403 access_denied` on
+every call tested, while `/world/articles`, `/world/categories` and
+`/world/blockfolders` all work on the same world with the same token. That
+pattern fits an *application*-scoped permission rather than an account tier —
+in which case the shared proxy's app key lacks a scope our own key might carry.
+
+```bash
+WA_APP_KEY=<key> WA_AUTH_TOKEN=<token> node -e "…listBlocks(SANDBOX)…"
+```
+
+If it succeeds, remove the 403 translation added in `api-client.js` and
+`list_blocks` becomes genuinely useful. If it still 403s, the endpoint is not
+available to this account at all and should be removed rather than explained.
+
+**2. 86 integration tests that have never run here.** `test/api.test.js` (75
+cases) and `test/timeline.test.js` (38 cases) both gate on
+`WA_AUTH_TOKEN && WA_APP_KEY` and skip wholesale without both. Requiring the
+key was deliberate — commit `d9bee80`, *"require both credentials for
+integration tests to avoid proxy flakiness"* — so this is not a bug to fix by
+loosening the gate. It does mean every fix in this file has been verified by
+hand-written probes rather than by the suite that exists for the purpose.
+
+**3. Issue 7, the 30-second timeout.** Direct mode removes the proxy hop
+entirely, which is the cleanest way to establish whether the timeout is
+client-side, proxy-side, or World Anvil's. Investigate that one *after* the key
+arrives rather than before.
 
 ---
 
