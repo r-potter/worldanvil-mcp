@@ -110,7 +110,26 @@ would commit the caller to the wrong one. ISSUES.md #9.
 
 **Upstream-worthy: yes**, unreservedly.
 
-## 6. Local documentation
+## 6. Entity references can be set
+
+**Files:** `src/handlers.js` · `src/tools.js` · `test/references.test.js`
+
+Reference fields are scalar string columns holding article UUIDs, comma-joined
+for multiples — not nested `{ id }` entities. An object or array is coerced by
+World Anvil to the literal text "Array" and reported as success. A new
+`references` parameter on both article write tools takes UUID strings or
+arrays, joins them, skips Markdown conversion, and refuses the shapes that
+corrupt; `fields` refuses object values for the same reason.
+
+Six fields World Anvil accepts and silently discards — `primarygeographicLocation`,
+`secondarygeographicLocation`, `species`, `ethnicity`, `currentLocation`,
+`geographicLocation` — are refused with an error saying so.
+That also explains ISSUES.md #3b: they were never a string-vs-object problem.
+
+**Upstream-worthy: yes.** ISSUES.md #6, whose field list was partly wrong —
+`relatedPersons` and `plots` do not exist on any template.
+
+## 7. Local documentation
 
 **Files:** `CLAUDE.md` (`## Testing`, `## The Auth Token`) · `ISSUES.md`
 
@@ -121,7 +140,7 @@ driving the server against a live world.
 IDs. ISSUES.md marks per-issue which findings are worth reporting upstream
 independently of this fork.
 
-## 7. Recorded test fixture
+## 8. Recorded test fixture
 
 **File:** `test/fixtures/article-write-response.json`
 

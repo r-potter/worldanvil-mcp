@@ -31,6 +31,110 @@ function errorResponse(error) {
 }
 
 /**
+ * Reference fields World Anvil accepts and then throws away.
+ *
+ * Verified against Sandbox on 2026-08-16: each returns `success: true` and
+ * leaves the field null, for every entity class tried as a target and for both
+ * the string and object shapes. They are settable only in the web editor.
+ * Refused here so the caller is not told a write happened when it did not.
+ */
+const DISCARDED_REFERENCES = {
+  primarygeographicLocation: "report",
+  secondarygeographicLocation: "report",
+  species: "person",
+  ethnicity: "person",
+  currentLocation: "person",
+  geographicLocation: "organization",
+};
+
+/**
+ * Fields owned by the other side of the association, which the article
+ * endpoint rejects outright with a 422. Named here so the message explains
+ * where the link is actually made.
+ */
+const INVERSE_REFERENCES = {
+  timeline:
+    "attach the article to a timeline from the history/timeline side instead",
+};
+
+/**
+ * Build the entity-reference portion of an article payload.
+ *
+ * Reference fields — `articleNext`, `relatedReports`, `species`, and the rest —
+ * are scalar string columns holding article UUIDs, comma-separated when a
+ * field takes several. They are NOT nested `{ id }` entities like `world` or
+ * `category`: sending an object or an array makes World Anvil store the
+ * literal string "Array" and report success, which is unrecoverable without
+ * noticing. Arrays are joined here so callers can pass the natural shape.
+ *
+ * Values are never Markdown-converted — they are identifiers, not prose.
+ *
+ * @param {Object} references - fieldName -> UUID string, or array of UUIDs
+ * @returns {Object} Payload fragment ready to merge
+ */
+function buildReferences(references) {
+  const data = {};
+
+  for (const [field, value] of Object.entries(references)) {
+    if (field in DISCARDED_REFERENCES) {
+      throw new Error(
+        `World Anvil accepts \`${field}\` on a ${DISCARDED_REFERENCES[field]} ` +
+          `article and silently discards it — the write reports success and ` +
+          `the field stays empty. It can only be set in the web editor. ` +
+          `Verified against a live world; not a limitation of this server.`,
+      );
+    }
+
+    if (field in INVERSE_REFERENCES) {
+      throw new Error(
+        `\`${field}\` is owned by the other side of the association and the ` +
+          `article endpoint rejects it — ${INVERSE_REFERENCES[field]}.`,
+      );
+    }
+
+    if (typeof value === "string") {
+      data[field] = value;
+      continue;
+    }
+
+    if (Array.isArray(value) && value.every((v) => typeof v === "string")) {
+      data[field] = value.join(",");
+      continue;
+    }
+
+    throw new Error(
+      `references.${field} must be an article UUID string, or an array of ` +
+        `them. World Anvil stores these as plain strings — an object such as ` +
+        `{ id: "..." } is coerced to the literal text "Array" and reported as ` +
+        `success.`,
+    );
+  }
+
+  return data;
+}
+
+/**
+ * Reject object-valued entries in `fields`.
+ *
+ * `fields` is passed through to the API as-is, so an object value hits the
+ * same "Array" coercion described above. Entity references belong in
+ * `references`; nested entities have dedicated parameters.
+ *
+ * @param {Object} fields - Template-specific fields from the caller
+ */
+function assertFieldsAreScalar(fields) {
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== null && typeof value === "object") {
+      throw new Error(
+        `fields.${key} is an object, which World Anvil stores as the literal ` +
+          `text "Array". If it is a link to another article, pass it in ` +
+          `\`references\` as a UUID string instead.`,
+      );
+    }
+  }
+}
+
+/**
  * Create a response for an article write.
  *
  * World Anvil echoes ~130 mostly-null fields plus the full world object back
@@ -115,7 +219,11 @@ export async function handleToolCall(name, args, client) {
           data.content = markdownToBBCode(args.content);
         if (args.icon !== undefined) data.icon = args.icon;
         if (args.fields !== undefined && typeof args.fields === "object") {
+          assertFieldsAreScalar(args.fields);
           Object.assign(data, convertFieldsToBBCode(args.fields));
+        }
+        if (args.references !== undefined && typeof args.references === "object") {
+          Object.assign(data, buildReferences(args.references));
         }
         if (args.category_id) data.category = { id: args.category_id };
         return articleWriteResponse(await client.createArticle(data), args);
@@ -128,7 +236,11 @@ export async function handleToolCall(name, args, client) {
           data.content = markdownToBBCode(args.content);
         if (args.icon !== undefined) data.icon = args.icon;
         if (args.fields !== undefined && typeof args.fields === "object") {
+          assertFieldsAreScalar(args.fields);
           Object.assign(data, convertFieldsToBBCode(args.fields));
+        }
+        if (args.references !== undefined && typeof args.references === "object") {
+          Object.assign(data, buildReferences(args.references));
         }
         if (args.category_id) data.category = { id: args.category_id };
         return articleWriteResponse(

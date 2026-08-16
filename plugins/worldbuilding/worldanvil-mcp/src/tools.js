@@ -167,6 +167,12 @@ export function getToolDefinitions() {
             description:
               "Return the complete article entity instead of a compacted one. By default the response drops empty fields and collapses nested entities to references; every field that holds a value is returned in full, so verbose is rarely needed.",
           },
+          references: {
+            type: "object",
+            description:
+              'Links to other articles, given as UUID strings (or an array of them, comma-joined for you). World Anvil stores these as plain strings, NOT as { id } objects — an object is coerced to the literal text "Array" and reported as success, so this parameter refuses that shape. WRITABLE, verified against a live world: articleParent, articleNext, articlePrevious (all templates); relatedReports (report); locations (plot). REFUSED because World Anvil accepts then silently discards them (web editor only): primarygeographicLocation, secondarygeographicLocation, species, ethnicity, currentLocation, geographicLocation. Example: { "articleNext": "uuid", "relatedReports": ["uuid1", "uuid2"] }',
+            additionalProperties: true,
+          },
         },
         required: ["title", "world_id", "template"],
       },
@@ -211,6 +217,12 @@ export function getToolDefinitions() {
             type: "boolean",
             description:
               "Return the complete article entity instead of a compacted one. By default the response drops empty fields and collapses nested entities to references; every field that holds a value is returned in full, so verbose is rarely needed.",
+          },
+          references: {
+            type: "object",
+            description:
+              'Links to other articles, given as UUID strings (or an array of them, comma-joined for you). World Anvil stores these as plain strings, NOT as { id } objects — an object is coerced to the literal text "Array" and reported as success, so this parameter refuses that shape. WRITABLE, verified against a live world: articleParent, articleNext, articlePrevious (all templates); relatedReports (report); locations (plot). REFUSED because World Anvil accepts then silently discards them (web editor only): primarygeographicLocation, secondarygeographicLocation, species, ethnicity, currentLocation, geographicLocation. Example: { "articleNext": "uuid", "relatedReports": ["uuid1", "uuid2"] }',
+            additionalProperties: true,
           },
         },
         required: ["article_id"],

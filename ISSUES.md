@@ -155,7 +155,9 @@ Tests in `test/list-articles.test.js`.
 >
 > Tests in `test/blocks.test.js`.
 
-**3b. Entity-reference fields accept plain strings.** `ethnicity` and `species` on the Person template want a link to an article. Passing a string returns `success: true` and changes nothing at all. Any field of this kind likely behaves the same way; the list should be established rather than discovered one at a time.
+**3b. Entity-reference fields accept plain strings.** *(Explained by issue 6: `species` and `ethnicity` are not writable through the API at all, in any shape. `references` now refuses them rather than reporting success.)*
+
+Original note: `ethnicity` and `species` on the Person template want a link to an article. Passing a string returns `success: true` and changes nothing at all. Any field of this kind likely behaves the same way; the list should be established rather than discovered one at a time.
 
 **3c. Wrong link prefixes resolve nowhere.** `@[Display](type:ID)` requires the prefix to match the target's entity class — `person:`, `organization:`, `article:`, `location:`. A mismatched prefix produces a link that looks correct and goes nowhere, with no error. Known entity classes should be validated, and an unknown or mismatched one should raise.
 
@@ -199,6 +201,60 @@ Tests in `test/list-articles.test.js`.
 `relatedPersons`, `plots`, `primarygeographicLocation`, `relatedReports`, `articleNext` and `articlePrevious` cannot be set through the server.
 
 **Impact.** This is the sole reason cross-linking session reports to their related articles cannot be scripted, and it is exactly the kind of bulk relational work an API is for. Currently entirely manual web-editor work.
+
+**Status — implemented and verified against Sandbox on 2026-08-16, but the
+field list in this issue was partly wrong.**
+
+These are **scalar string columns holding article UUIDs**, comma-separated
+when a field takes several — not nested `{ id }` entities like `world` or
+`category`. Sending an object or an array makes World Anvil store the literal
+text **`"Array"`** (a PHP array-to-string coercion) and report success.
+
+| shape sent | stored |
+|---|---|
+| `{ id: uuid }` | `"Array"` |
+| `[uuid1, uuid2]` | `"Array"` |
+| `"uuid1,uuid2"` | correct |
+| `"uuid"` | correct |
+
+A new `references` parameter on `create_article` and `update_article` takes
+UUID strings or arrays of them, joins arrays itself, skips Markdown conversion,
+and refuses the object shape. `fields` now also refuses object values, which
+hit the same coercion.
+
+**Which of the six named fields are real:**
+
+| field | verdict |
+|---|---|
+| `articleNext` | writable |
+| `articlePrevious` | writable |
+| `articleParent` | writable (resolves to an object on read) |
+| `relatedReports` | writable |
+| `locations` (plot) | writable |
+| `primarygeographicLocation` | **accepted and discarded** — success, stays null |
+| `secondarygeographicLocation` | **accepted and discarded** |
+| `relatedPersons` | **does not exist** on any template tried |
+| `plots` | **does not exist** on any template tried |
+
+`relatedPersons` and `plots` appear to be web-editor labels rather than API
+fields; the Report template carries `rewards`, `quests`, `interactions`,
+`relatedReports` and `reportNotes` instead. Also discarded: `species`,
+`ethnicity`, `currentLocation` (person) and `geographicLocation`
+(organization) — which is **issue 3b, now explained**: they are not a
+string-versus-object problem, they are simply not writable through the API.
+`timeline` is different again, rejecting with a 422 *"Tried to update
+association from owned side"* — it is set from the timeline side.
+
+All six discarded fields are refused by `references` with an error saying so,
+rather than passed through to report a write that did not happen.
+
+**Session-report cross-linking now scripts.** Verified end to end: chaining
+Session 4 → Session 5 with `articleNext`/`articlePrevious` and populating
+`relatedReports`. The location anchoring in the original complaint cannot be
+scripted, and that is World Anvil's limit rather than this server's.
+
+Tests in `test/references.test.js`.
+
 
 ---
 
