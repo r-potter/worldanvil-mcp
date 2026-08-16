@@ -148,6 +148,77 @@ function assertFieldsAreScalar(fields) {
   }
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * File a block, into whichever of the two folder systems the id belongs to.
+ *
+ * A Block carries two unrelated folder fields, and which one a world uses
+ * depends on how its blocks were made. Established against Sandbox and by
+ * reading a world whose blocks predate this server, 2026-08-16:
+ *
+ *   blockfolder  { id: <integer> }   A BlockFolder — the entity
+ *                                    create_blockfolder makes and
+ *                                    list_blocks_in_folder enumerates. Reads
+ *                                    back under `blockfolder`; `folderId`
+ *                                    stays "-1" regardless.
+ *   folderId     "<uuid>"            The folder the web editor files a block
+ *                                    under. Not a BlockFolder: the UUID
+ *                                    resolves through no endpoint, and
+ *                                    list_blockfolders does not report it.
+ *
+ * `folderId` is marked `readOnly` in the vendor spec and is not — it accepts a
+ * UUID and persists it. That is the only way to file a block alongside ones
+ * created in the web editor, so it is exposed here.
+ *
+ * Routing by shape rather than asking the caller which system they mean: the
+ * two id formats do not overlap, and a UUID sent as `blockfolder.id` returns a
+ * 500 HTML page, so the id alone says which field was meant.
+ *
+ * @param {Object} data - Payload fragment to mutate
+ * @param {string|number} folderId - BlockFolder integer id, or a folder UUID
+ */
+function applyBlockFolder(data, folderId) {
+  if (typeof folderId === "number" || /^-?\d+$/.test(String(folderId))) {
+    data.blockfolder = { id: folderId };
+    return;
+  }
+
+  if (UUID.test(String(folderId))) {
+    data.folderId = String(folderId);
+    return;
+  }
+
+  throw new Error(
+    `folder_id must be a BlockFolder id (an integer, from ` +
+      `worldanvil_create_blockfolder or worldanvil_list_blockfolders) or a ` +
+      `folder UUID as reported by a block's \`folderId\`. Got: ${folderId}`,
+  );
+}
+
+/**
+ * Reduce block tags to the single comma-separated string the entity stores.
+ *
+ * An array is coerced to the literal text "Array", the same trap as the
+ * article reference fields — and worse here, because the write response echoes
+ * back the array that was sent, so nothing looks wrong until the block is read
+ * again. Joined client-side so both shapes work.
+ *
+ * Note the entity's `tags` is not the `tags:` key inside a block payload: they
+ * share a name and are unrelated, and setting the payload one leaves the
+ * entity's still null.
+ *
+ * @param {string|string[]} tags - Tag or tags; "" clears them
+ * @returns {string} Comma-separated tags
+ */
+function blockTags(tags) {
+  const list = Array.isArray(tags) ? tags : [tags];
+  return list
+    .map((tag) => String(tag).trim())
+    .filter(Boolean)
+    .join(",");
+}
+
 /**
  * Create a response for an article write.
  *
@@ -765,11 +836,12 @@ export async function handleToolCall(name, args, client) {
           title: args.title,
           template: { id: args.template_id }, // Requires a valid BlockTemplate ID
         };
-        // The field is `blockfolder`, not `folder`. Sending `folder` returned
-        // success and left the block unfiled — and an unfiled block cannot be
-        // enumerated, since listing goes through /blockfolder/blocks.
+        // The field is `blockfolder`, not `folder` as the spec has it. Sending
+        // `folder` returns success and leaves the block unfiled. See
+        // applyBlockFolder for the second, UUID-keyed folder system.
         if (args.folder_id !== undefined)
-          data.blockfolder = { id: args.folder_id };
+          applyBlockFolder(data, args.folder_id);
+        if (args.tags !== undefined) data.tags = blockTags(args.tags);
         // Same payload fields as update_block, and equally verbatim. Supplying
         // one here saves a second call to populate a newly created block.
         for (const field of ["textualdata", "tabulardata", "jsondata"]) {
@@ -812,12 +884,14 @@ export async function handleToolCall(name, args, client) {
 
         // Filing a block is what makes it discoverable — see create_block.
         if (args.folder_id !== undefined)
-          data.blockfolder = { id: args.folder_id };
+          applyBlockFolder(data, args.folder_id);
+
+        if (args.tags !== undefined) data.tags = blockTags(args.tags);
 
         if (Object.keys(data).length === 0) {
           throw new Error(
-            "Nothing to update: pass `title`, or one of `textualdata`, " +
-              "`tabulardata`, `jsondata`.",
+            "Nothing to update: pass `title`, `tags`, `folder_id`, or one of " +
+              "`textualdata`, `tabulardata`, `jsondata`.",
           );
         }
 

@@ -1250,7 +1250,8 @@ export function getToolDefinitions() {
     },
     {
       name: "worldanvil_list_blocks",
-      description: "List all blocks in a world",
+      description:
+        "List all blocks in a world, paginated. Usually the only way to enumerate blocks — worldanvil_list_blocks_in_folder sees only blocks filed into a BlockFolder, which excludes anything filed in the web editor. The endpoint is undocumented and returns 403 on some worlds; if it does, fall back to listing block folders and then their blocks.",
       inputSchema: {
         type: "object",
         properties: {
@@ -1288,9 +1289,15 @@ export function getToolDefinitions() {
               "ID of the BlockTemplate to use (required - create templates via WorldAnvil web UI)",
           },
           folder_id: {
-            type: "number",
+            type: ["number", "string"],
             description:
-              "Optional BlockFolder ID to file the block under. Strongly recommended: block listing goes through worldanvil_list_blocks_in_folder, so an unfiled block cannot be enumerated afterwards.",
+              "Optional folder to file the block under. Two unrelated folder systems exist and the id says which one you mean: an INTEGER is a BlockFolder (from worldanvil_create_blockfolder / worldanvil_list_blockfolders, and the only kind worldanvil_list_blocks_in_folder can enumerate); a UUID is the web-editor folder a block reports as `folderId`, which resolves through no endpoint but is writable. To match blocks that already exist in a world, copy the `folderId` UUID off one of them. Filing matters: an unfiled block is hard to find again.",
+          },
+          tags: {
+            type: ["string", "array"],
+            items: { type: "string" },
+            description:
+              'Optional tags, as a comma-separated string or an array (arrays are joined for you — World Anvil stores the literal text "Array" if one is sent through unmediated). NOTE this is the entity\'s own tags field; the `tags:` key inside a block payload is a different thing entirely and does not populate it.',
           },
           textualdata: {
             type: "string",
@@ -1321,9 +1328,15 @@ export function getToolDefinitions() {
           block_id: { type: "string", description: "Block ID" },
           title: { type: "string", description: "New block title" },
           folder_id: {
-            type: "number",
+            type: ["number", "string"],
             description:
-              "Move the block into a BlockFolder. Filing matters: block listing goes through worldanvil_list_blocks_in_folder, so an unfiled block cannot be enumerated.",
+              "Move the block into a folder. An INTEGER is a BlockFolder (created and listed through the blockfolder tools, and the only kind worldanvil_list_blocks_in_folder can enumerate); a UUID is the web-editor folder a block reports as `folderId`. Copy the UUID off an existing block to file this one alongside it.",
+          },
+          tags: {
+            type: ["string", "array"],
+            items: { type: "string" },
+            description:
+              'Replace the block\'s tags, as a comma-separated string or an array (arrays are joined for you — sent as-is World Anvil stores the literal text "Array"). Pass "" to clear. This is the entity\'s tags field, not the `tags:` key inside the block payload.',
           },
           textualdata: {
             type: "string",

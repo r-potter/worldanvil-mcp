@@ -176,6 +176,61 @@ describe("block folder filing", () => {
     expect(data).not.toHaveProperty("folder");
   });
 
+  // ISSUES.md #11: `folder_id` was typed `number`, and the folders a world
+  // already uses are UUIDs — so the parameter could not express the value it
+  // needed and blocks landed unfiled. The two ids are different systems, and
+  // a UUID sent as `blockfolder.id` returns a 500.
+  it("files a UUID folder under folderId, not blockfolder", async () => {
+    await handleToolCall(
+      "worldanvil_create_block",
+      {
+        title: "Discern Composition",
+        template_id: 19552,
+        folder_id: "93837178-ac6f-4217-b826-6f66250cfc4b",
+      },
+      client,
+    );
+
+    const [data] = client.createBlock.mock.calls[0];
+    expect(data.folderId).toBe("93837178-ac6f-4217-b826-6f66250cfc4b");
+    expect(data).not.toHaveProperty("blockfolder");
+  });
+
+  it("treats a numeric string as a BlockFolder id", async () => {
+    await handleToolCall(
+      "worldanvil_update_block",
+      { block_id: "1687079", folder_id: "42875" },
+      client,
+    );
+
+    const [, data] = client.updateBlock.mock.calls[0];
+    expect(data.blockfolder).toEqual({ id: "42875" });
+    expect(data).not.toHaveProperty("folderId");
+  });
+
+  it("refuses a folder id that is neither", async () => {
+    const result = await handleToolCall(
+      "worldanvil_update_block",
+      { block_id: "1687079", folder_id: "Spells" },
+      client,
+    );
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("folder_id");
+    expect(client.updateBlock).not.toHaveBeenCalled();
+  });
+
+  it("moves an existing block into a UUID folder", async () => {
+    await handleToolCall(
+      "worldanvil_update_block",
+      { block_id: "1687079", folder_id: "1ca15d18-73d6-4d03-a8f0-a007055597e9" },
+      client,
+    );
+
+    const [, data] = client.updateBlock.mock.calls[0];
+    expect(data.folderId).toBe("1ca15d18-73d6-4d03-a8f0-a007055597e9");
+  });
+
   it("omits the folder entirely when none is given", async () => {
     await handleToolCall(
       "worldanvil_create_block",
@@ -197,6 +252,65 @@ describe("block folder filing", () => {
 
     const [, data] = client.updateBlock.mock.calls[0];
     expect(data.blockfolder).toEqual({ id: 42873 });
+  });
+});
+
+// ISSUES.md #11: the entity's `tags` had no parameter at all, so a block
+// created here could not be made to match the ones already in a world.
+describe("block tags", () => {
+  let client;
+
+  beforeEach(() => {
+    client = {
+      createBlock: vi.fn(async () => ({ success: true, id: 1 })),
+      updateBlock: vi.fn(async () => ({ success: true, id: 1 })),
+    };
+  });
+
+  it("sets tags on create", async () => {
+    await handleToolCall(
+      "worldanvil_create_block",
+      { title: "Spell", template_id: 19552, tags: "spell-matter-1" },
+      client,
+    );
+
+    const [data] = client.createBlock.mock.calls[0];
+    expect(data.tags).toBe("spell-matter-1");
+  });
+
+  // An array reaches the API as the literal text "Array" — and the write
+  // response echoes the array back, so the loss is invisible until a re-read.
+  it("joins an array rather than letting it become \"Array\"", async () => {
+    await handleToolCall(
+      "worldanvil_update_block",
+      { block_id: "1687079", tags: ["spell-death-3", "rote"] },
+      client,
+    );
+
+    const [, data] = client.updateBlock.mock.calls[0];
+    expect(data.tags).toBe("spell-death-3,rote");
+  });
+
+  it("clears tags with an empty string", async () => {
+    await handleToolCall(
+      "worldanvil_update_block",
+      { block_id: "1687079", tags: "" },
+      client,
+    );
+
+    const [, data] = client.updateBlock.mock.calls[0];
+    expect(data.tags).toBe("");
+  });
+
+  it("counts tags as something to update", async () => {
+    const result = await handleToolCall(
+      "worldanvil_update_block",
+      { block_id: "1687079", tags: "merit" },
+      client,
+    );
+
+    expect(result.isError).toBeUndefined();
+    expect(client.updateBlock).toHaveBeenCalled();
   });
 });
 

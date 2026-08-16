@@ -583,15 +583,17 @@ export class WorldAnvilClient {
    * List blocks in a world
    *
    * `/world/blocks` is not in the published API surface — Swagger documents
-   * only `/world/blockfolders` and `/blockfolder/blocks`. The route exists (it
-   * answers with a structured `access_denied` rather than an HTML 404) but has
-   * returned 403 on every call tested, which is consistent with a Block being
-   * owned by a user and a folder rather than by a world: the entity carries
-   * `author` and `blockfolder`, and no `world` field at all.
+   * only `/world/blockfolders` and `/blockfolder/blocks` — but it works, and
+   * is normally the only way to enumerate blocks: `/blockfolder/blocks` sees
+   * only blocks associated with a BlockFolder, and blocks filed in the web
+   * editor are not.
    *
-   * Left in place rather than removed, in case the permission is account- or
-   * tier-dependent, but the 403 is translated into something that names the
-   * working alternative.
+   * It is world-dependent. Verified 2026-08-16 with one token: 137 blocks
+   * across three pages on one world, `403 access_denied` on another. Which
+   * property of a world decides that is unknown — both worlds have an RPG
+   * system set, and the denial does not depend on whether any block exists.
+   * The 403 is translated rather than passed through, because the fallback is
+   * not obvious and is not equivalent.
    */
   async listBlocks(worldId, options = {}) {
     const body = {
@@ -603,10 +605,12 @@ export class WorldAnvilClient {
     } catch (error) {
       if (!/\(40[13]\)/.test(error.message)) throw error;
       throw new Error(
-        `${error.message} — /world/blocks is undocumented and has not been ` +
-          `observed to work. Blocks belong to a folder, not a world: list ` +
-          `folders with list_blockfolders, then call list_blocks_in_folder ` +
-          `for each. Note that blocks left unfiled cannot be enumerated at all.`,
+        `${error.message} — /world/blocks is undocumented and is denied on ` +
+          `some worlds while working on others; nothing about the request is ` +
+          `wrong. Fall back to list_blockfolders and list_blocks_in_folder, ` +
+          `but note that only covers blocks associated with a BlockFolder: ` +
+          `blocks filed in the web editor carry a UUID \`folderId\` instead ` +
+          `and will not appear.`,
       );
     }
   }
