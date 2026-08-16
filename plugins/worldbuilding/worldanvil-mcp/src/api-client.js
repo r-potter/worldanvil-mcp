@@ -579,12 +579,36 @@ export class WorldAnvilClient {
     return this.request(`/block?id=${blockId}&granularity=2`);
   }
 
+  /**
+   * List blocks in a world
+   *
+   * `/world/blocks` is not in the published API surface — Swagger documents
+   * only `/world/blockfolders` and `/blockfolder/blocks`. The route exists (it
+   * answers with a structured `access_denied` rather than an HTML 404) but has
+   * returned 403 on every call tested, which is consistent with a Block being
+   * owned by a user and a folder rather than by a world: the entity carries
+   * `author` and `blockfolder`, and no `world` field at all.
+   *
+   * Left in place rather than removed, in case the permission is account- or
+   * tier-dependent, but the 403 is translated into something that names the
+   * working alternative.
+   */
   async listBlocks(worldId, options = {}) {
     const body = {
       limit: options.limit !== undefined ? String(options.limit) : "50",
       offset: options.offset !== undefined ? String(options.offset) : "0",
     };
-    return this.request(`/world/blocks?id=${worldId}`, "POST", body);
+    try {
+      return await this.request(`/world/blocks?id=${worldId}`, "POST", body);
+    } catch (error) {
+      if (!/\(40[13]\)/.test(error.message)) throw error;
+      throw new Error(
+        `${error.message} — /world/blocks is undocumented and has not been ` +
+          `observed to work. Blocks belong to a folder, not a world: list ` +
+          `folders with list_blockfolders, then call list_blocks_in_folder ` +
+          `for each. Note that blocks left unfiled cannot be enumerated at all.`,
+      );
+    }
   }
 
   async listBlocksInFolder(blockFolderId, options = {}) {

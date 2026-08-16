@@ -9,7 +9,7 @@ decision from the diff.
 | **Upstream** | [wlcarden/worldanvil-claude-plugin](https://github.com/wlcarden/worldanvil-claude-plugin) (npm `worldanvil-mcp`) |
 | **This fork** | `git@github.com:r-potter/worldanvil-mcp.git` |
 | **Fork point** | `f8243b6` — *fix: green CI before v1.12.0 publish*, v1.12.0, 2026-06-01 |
-| **Local commits** | 4 |
+| **Local commits** | 5 |
 
 Regenerate the authoritative list at any time:
 
@@ -63,6 +63,15 @@ Markdown→BBCode over it first, which corrupts YAML (`---` → `[hr]`, `- item`
 `[ul][li]`). Both are fixed: the real fields are exposed and sent verbatim,
 `content` now raises, and `create_block` can carry a payload so a populated
 statblock takes one call.
+
+The same defect appeared twice more nearby: `create_block` sent `folder`
+where the field is `blockfolder`, so `folder_id` never worked and every block
+landed unfiled — and an unfiled block cannot be enumerated, because listing
+goes through `/blockfolder/blocks`. Both create and update now file correctly.
+
+`list_blocks` calls `/world/blocks`, which is absent from the published API
+surface and returns 403 on every call tested. Kept, but the 403 is translated
+into an error naming the working path (folders, then blocks per folder).
 
 **Upstream-worthy: yes**, unreservedly. ISSUES.md #3a — note that the issue's
 own diagnosis and suggested fix were both wrong, corrected in place.

@@ -623,8 +623,12 @@ export async function handleToolCall(name, args, client) {
         const data = {
           title: args.title,
           template: { id: args.template_id }, // Requires a valid BlockTemplate ID
-          folder: args.folder_id ? { id: args.folder_id } : undefined,
         };
+        // The field is `blockfolder`, not `folder`. Sending `folder` returned
+        // success and left the block unfiled — and an unfiled block cannot be
+        // enumerated, since listing goes through /blockfolder/blocks.
+        if (args.folder_id !== undefined)
+          data.blockfolder = { id: args.folder_id };
         // Same payload fields as update_block, and equally verbatim. Supplying
         // one here saves a second call to populate a newly created block.
         for (const field of ["textualdata", "tabulardata", "jsondata"]) {
@@ -664,6 +668,10 @@ export async function handleToolCall(name, args, client) {
               ? args[field]
               : JSON.stringify(args[field]);
         }
+
+        // Filing a block is what makes it discoverable — see create_block.
+        if (args.folder_id !== undefined)
+          data.blockfolder = { id: args.folder_id };
 
         if (Object.keys(data).length === 0) {
           throw new Error(

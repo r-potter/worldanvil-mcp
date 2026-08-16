@@ -1277,7 +1277,8 @@ export function getToolDefinitions() {
           },
           folder_id: {
             type: "number",
-            description: "Optional BlockFolder ID to organize the block",
+            description:
+              "Optional BlockFolder ID to file the block under. Strongly recommended: block listing goes through worldanvil_list_blocks_in_folder, so an unfiled block cannot be enumerated afterwards.",
           },
           textualdata: {
             type: "string",
@@ -1307,6 +1308,11 @@ export function getToolDefinitions() {
         properties: {
           block_id: { type: "string", description: "Block ID" },
           title: { type: "string", description: "New block title" },
+          folder_id: {
+            type: "number",
+            description:
+              "Move the block into a BlockFolder. Filing matters: block listing goes through worldanvil_list_blocks_in_folder, so an unfiled block cannot be enumerated.",
+          },
           textualdata: {
             type: "string",
             description:

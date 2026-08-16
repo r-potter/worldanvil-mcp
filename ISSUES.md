@@ -127,6 +127,26 @@ Tests in `test/list-articles.test.js`.
 > a populated statblock takes one call instead of two. The
 > generate-for-manual-paste workaround is no longer needed.
 >
+> **A third instance of the same bug turned up next door.** `create_block` sent
+> `folder: { id }`; the field is `blockfolder`. So `folder_id` had never worked
+> — every block created through this server landed unfiled, silently. That
+> matters more than it sounds, because **an unfiled block cannot be
+> enumerated**: listing goes through `/blockfolder/blocks`. Both `create_block`
+> and `update_block` now send `blockfolder`, verified against Sandbox.
+>
+> **`list_blocks` is broken at the API, not here.** `/world/blocks` is absent
+> from the published surface — Swagger documents only `/world/blockfolders`
+> and `/blockfolder/blocks` — and returns `403 access_denied` on every call
+> tested. It is a real route (it answers with structured JSON rather than an
+> HTML 404, unlike `/user/blocks`), so it has not been removed, but the 403 is
+> now translated into an error naming the working path: list folders, then list
+> blocks per folder. Whether the 403 is tier- or account-dependent, or whether
+> a direct `WA_APP_KEY` would succeed where the shared proxy key does not, is
+> untested — that is the obvious next probe.
+>
+> Consistent with all of this, a Block has no `world` field at all; it carries
+> `author` and `blockfolder`.
+>
 > Tests in `test/blocks.test.js`.
 
 **3b. Entity-reference fields accept plain strings.** `ethnicity` and `species` on the Person template want a link to an article. Passing a string returns `success: true` and changes nothing at all. Any field of this kind likely behaves the same way; the list should be established rather than discovered one at a time.

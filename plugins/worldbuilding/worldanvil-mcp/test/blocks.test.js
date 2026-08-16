@@ -13,6 +13,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleToolCall } from "../src/handlers.js";
 import { markdownToBBCode } from "../src/utils.js";
+import { WorldAnvilClient } from "../src/api-client.js";
 
 const YAML = "merit_name: Danger Sense\nmerit_dots: '2'";
 
@@ -145,5 +146,78 @@ describe("worldanvil_create_block", () => {
 
     const [data] = client.createBlock.mock.calls[0];
     expect(data).not.toHaveProperty("textualdata");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block filing and enumeration
+// ---------------------------------------------------------------------------
+
+describe("block folder filing", () => {
+  let client;
+
+  beforeEach(() => {
+    client = {
+      createBlock: vi.fn(async () => ({ success: true, id: 1 })),
+      updateBlock: vi.fn(async () => ({ success: true, id: 1 })),
+    };
+  });
+
+  // `folder` is silently ignored by the API; the field is `blockfolder`.
+  it("files a new block using the blockfolder key", async () => {
+    await handleToolCall(
+      "worldanvil_create_block",
+      { title: "Merit", template_id: 19552, folder_id: 42873 },
+      client,
+    );
+
+    const [data] = client.createBlock.mock.calls[0];
+    expect(data.blockfolder).toEqual({ id: 42873 });
+    expect(data).not.toHaveProperty("folder");
+  });
+
+  it("omits the folder entirely when none is given", async () => {
+    await handleToolCall(
+      "worldanvil_create_block",
+      { title: "Merit", template_id: 19552 },
+      client,
+    );
+
+    const [data] = client.createBlock.mock.calls[0];
+    expect(data).not.toHaveProperty("blockfolder");
+    expect(data).not.toHaveProperty("folder");
+  });
+
+  it("can refile an existing block", async () => {
+    await handleToolCall(
+      "worldanvil_update_block",
+      { block_id: "1687079", folder_id: 42873 },
+      client,
+    );
+
+    const [, data] = client.updateBlock.mock.calls[0];
+    expect(data.blockfolder).toEqual({ id: 42873 });
+  });
+});
+
+describe("WorldAnvilClient.listBlocks", () => {
+  it("explains the 403 and names the working alternative", async () => {
+    const client = new WorldAnvilClient({ authToken: "test-token" });
+    client.request = vi.fn(async () => {
+      throw new Error("API Error (403): access_denied");
+    });
+
+    await expect(client.listBlocks("world-1")).rejects.toThrow(
+      /list_blocks_in_folder/,
+    );
+  });
+
+  it("does not swallow unrelated errors", async () => {
+    const client = new WorldAnvilClient({ authToken: "test-token" });
+    client.request = vi.fn(async () => {
+      throw new Error("API Error (500): boom");
+    });
+
+    await expect(client.listBlocks("world-1")).rejects.toThrow(/500/);
   });
 });
