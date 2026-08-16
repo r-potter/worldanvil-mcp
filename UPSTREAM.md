@@ -9,12 +9,12 @@ decision from the diff.
 | **Upstream** | [wlcarden/worldanvil-claude-plugin](https://github.com/wlcarden/worldanvil-claude-plugin) (npm `worldanvil-mcp`) |
 | **This fork** | `git@github.com:r-potter/worldanvil-mcp.git` |
 | **Fork point** | `f8243b6` — *fix: green CI before v1.12.0 publish*, v1.12.0, 2026-06-01 |
-| **Local commits** | 5 |
 
-Regenerate the authoritative list at any time:
+Regenerate the authoritative list of changes, and the commit count, at any
+time — do not transcribe either into this file, they go stale on every merge:
 
 ```bash
-git diff --stat f8243b6 HEAD
+git diff --stat f8243b6 HEAD && git log --oneline f8243b6..HEAD
 ```
 
 ---
@@ -130,4 +130,4 @@ decision rather than oversight.
 2. Re-read *Deliberate non-changes* above before resolving anything.
 3. Check whether upstream has independently fixed any ISSUES.md entry — several
    are marked *upstream: yes* and may arrive fixed.
-4. Update the fork point and local commit count in the table above.
+4. Update the fork point in the table above.
