@@ -432,6 +432,146 @@ response already approximates this, but by accident rather than by contract.
 
 ---
 
+## 11. Block `tags` and folder filing are still unreachable — *upstream: investigate*
+
+**Not yet built.** Recorded 2026-08-16, while importing the first spell statblock
+into Fallen London — block `1687174`, *Discern Composition*.
+
+**The content write itself is sound.** This is the other half of issue 3a, and
+that fix holds up live: `create_block` with `textualdata` round-tripped
+**byte-identical**, including curly apostrophes, en dashes, `[b]` BBCode and
+literal `\r\n` escapes, and a follow-up `update_block` persisted an added
+`blockId` key. Nothing below is about the payload.
+
+**Symptom.** A block created through the server cannot be made to match the
+blocks already in the world. Two metadata fields are unreachable:
+
+| | existing spell blocks | block created via MCP |
+|---|---|---|
+| `tags` | `spell-matter-1` | `null` |
+| `folderId` | `93837178-…` (Spells) | `-1` (world root) |
+
+**`tags` has no parameter at all** on `create_block` or `update_block`. Note the
+trap: the block *payload* has its own `tags:` key, and setting it does **not**
+populate the entity's `tags` field. The payload sent for `1687174` contained
+`tags: spell-matter-1` and the entity still came back `tags: null`. They are
+different things with the same name.
+
+**`folder_id` is typed `number`**, but every real `folderId` in this world is a
+UUID — `93837178-ac6f-4217-b826-6f66250cfc4b` for Spells, `88bc9e9e-…` for
+merits, `1dc3a49e-…` for dread powers, `1ca15d18-…` for attainments. So the
+parameter cannot express the value it needs, and the block landed unfiled. This
+sits oddly beside 3a's *"Both `create_block` and `update_block` now send
+`blockfolder`, verified against Sandbox"* — the wiring may be right while the
+parameter type makes it unusable against a world whose folders predate it.
+**Establish whether Sandbox's folders are numeric and Fallen London's are UUIDs
+before changing anything.**
+
+**The folder entity does not resolve either.** Against Fallen London:
+
+| call | result |
+|---|---|
+| `list_blockfolders(world)` | `[]` — empty, though blocks sit in six distinct folders |
+| `get_blockfolder("93837178-…")` | `404 resource_not_found` |
+| `list_blocks_in_folder("93837178-…")` | `404 resource_not_found` |
+
+So the UUID on a block's `folderId` is not the id of any enumerable BlockFolder,
+and the documented "list folders, then list blocks per folder" path returns
+nothing on a world with 137 blocks. Whether `folderId` is a different namespace,
+or block folders are user-scoped rather than world-scoped, is the thing to find
+out first.
+
+**`list_blocks` does not 403 here, contradicting the note under *Blocked on an
+application key*.** `/world/blocks` answered normally against Fallen London in
+proxy mode, returning all 137 blocks across three pages of 50, with `limit` and
+`offset` both behaving. Either the 403 is world- or account-specific, or it has
+since changed. Recheck before removing the endpoint as unavailable — and note
+that with `list_blockfolders` returning empty, `list_blocks` is currently the
+*only* way to enumerate blocks at all, which inverts the guidance in 3a.
+
+**Why it matters.** 267 of the 296 spells in the vault's `Game Mechanics/Spells`
+JSON are not yet mirrored. Importing them today would produce 267 untagged,
+unfiled blocks in the world root, each needing hand-correction in the web
+editor — strictly worse than the manual work it replaces. The tags carry the
+arcanum and level (`spell-death-3`), so they are not cosmetic. **The bulk import
+is blocked on this, and only on this.**
+
+**Fix.** Expose `tags` on `create_block` and `update_block`. Establish what
+`folderId` actually refers to and make `folder_id` accept it, whatever its type
+turns out to be. Both want verifying against a world with pre-existing folders,
+not only against freshly created ones.
+
+**Status — fixed and verified against Sandbox on 2026-08-16.** Both fields are
+reachable now. The framing above was right that something was missing and wrong
+about what: it is not that Sandbox's folders are numeric and Fallen London's are
+UUIDs, but that **a Block has two unrelated folder fields and the two worlds use
+different ones**.
+
+| field | id | who sets it | enumerable by |
+|---|---|---|---|
+| `blockfolder` | integer (`42875`) | `create_blockfolder`, i.e. this server | `list_blocks_in_folder` |
+| `folderId` | UUID (`93837178-…`) | the web editor | nothing |
+
+They do not track each other. A block filed correctly into BlockFolder 42875
+reads back `blockfolder: { id: 42875 }` and **`folderId: "-1"` regardless** —
+so 11's *"`folderId` `-1` (world root)"* was not evidence the block landed
+unfiled, exactly the misreading issue 8 describes for articles. Conversely
+Fallen London's blocks read `blockfolder: null` with a UUID `folderId`, which is
+why `list_blockfolders` returns `[]` there: the world has no BlockFolders at
+all, only web-editor folders.
+
+**The UUID is writable, and that is what unblocks the import.** `folderId` is
+marked `readOnly` in the vendor spec and is not — it accepts a UUID and persists
+it. That is the only way to file a block alongside ones made in the web editor.
+The UUID resolves through no endpoint tested (`/blockfolder`, `/category` and
+`/article` all 404), and sending it as `blockfolder: { id }` returns a **500
+carrying an HTML page**, so the two systems cannot be conflated.
+
+`folder_id` is therefore typed `["number", "string"]` and routed by shape:
+integer → `blockfolder`, UUID → `folderId`, anything else refused by name.
+
+**`tags` is a comma-separated string**, and an array becomes the literal
+`"Array"` — the `articleNext` coercion from issue 6, one field further on. Worse
+here: the write response **echoes back the array you sent** while the stored
+value is `"Array"`, so nothing looks wrong until the block is read again. Arrays
+are joined client-side; both shapes work.
+
+**`list_blocks` is world-dependent, not key-dependent.** With one token, in
+proxy mode, on the same afternoon: 137 blocks on Fallen London, `403
+access_denied` on Sandbox. Not explained by either obvious candidate — both
+worlds have an RPG system set, and Sandbox still 403d after blocks existed in
+it. So the note under *Blocked on an application key* overstates its case: the
+endpoint plainly works, and an app key may not be what stands between Sandbox
+and a listing. The 403 message no longer claims otherwise, and no longer
+recommends the folder walk without qualification — that walk sees only
+BlockFolder-filed blocks, so on Fallen London it would report zero.
+
+**Two more silent-ignore instances, found in passing and not acted on:**
+`RPGSRD: { id }` on create is discarded (the block inherits its template's
+system) even though the spec marks it required; and **blocks are created
+`state: "public"`**, which belongs with issue 4 rather than here.
+
+**One thing left to verify by eye, and it cannot be done through the API.**
+Persisting `folderId` is confirmed; whether the web editor then *shows* the
+block in that folder is not, because nothing reads the UUID back except the
+block itself. The evidence is circumstantial but strong — all 29 spell blocks
+share one UUID, the merits another. **Import one spell first and look at it in
+the editor** before running the remaining 266.
+
+Tests in `test/blocks.test.js`.
+
+**Carry into the import: page references are `MtAw p. 123`, spaced.** APA style,
+and the settled convention. The vault JSON is already normalised to it — all 72
+references across the ten `Game Mechanics/Spells/*.json` files. **World Anvil is
+the inconsistent copy**: block `1634793` (Control Instincts) alone carries both
+`MtAw p. 126` and `MtAw p.289`, so the unspaced form is scattered through the 29
+blocks that predate this. Do not reconcile them by hand and do not revert the
+vault to match — the bulk import rewrites these blocks from the JSON anyway, so
+the inconsistency resolves itself as a side effect. Just do not introduce a
+`p.123` on the way through.
+
+---
+
 ## Blocked on an application key
 
 **Status: requested, not yet issued (as of 2026-08-16).** The server currently
@@ -440,10 +580,13 @@ injecting its own application key. Setting `WA_APP_KEY` switches to direct mode
 against `www.worldanvil.com`. Three things are waiting on that.
 
 **1. The `list_blocks` 403.** `/world/blocks` returns `403 access_denied` on
-every call tested, while `/world/articles`, `/world/categories` and
-`/world/blockfolders` all work on the same world with the same token. That
-pattern fits an *application*-scoped permission rather than an account tier —
-in which case the shared proxy's app key lacks a scope our own key might carry.
+Sandbox, while `/world/articles`, `/world/categories` and `/world/blockfolders`
+all work on the same world with the same token.
+
+**Weakened by issue 11, 2026-08-16.** The same call, same token, same proxy
+mode, succeeds on Fallen London — 137 blocks across three pages. So this is
+*world*-scoped, not application-scoped, and an app key is no longer the obvious
+suspect. Worth one call when the key arrives, but expect it to change nothing.
 
 ```bash
 WA_APP_KEY=<key> WA_AUTH_TOKEN=<token> node -e "…listBlocks(SANDBOX)…"

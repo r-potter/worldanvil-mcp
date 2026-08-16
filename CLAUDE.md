@@ -110,6 +110,8 @@ Quick hits:
 - List endpoints use `POST` with a body (not `GET` with query params)
 - Entity references (`articleNext` and friends) are the *opposite*: plain UUID
   strings, comma-separated for multiples — an object becomes the literal `"Array"`
+- A Block has *two* unrelated folder fields — integer `blockfolder` and UUID
+  `folderId` — and each reads back empty in the other's world
 - Space calls ~750ms apart; Cloudflare returns 429 otherwise
 
 Fetch the vendor spec locally with `npm run fetch-spec` (gitignored, not committed).

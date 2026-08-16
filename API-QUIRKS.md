@@ -26,6 +26,10 @@ see `UPSTREAM.md`.
 | 3 | `primarygeographicLocation`, `secondarygeographicLocation`, `species`, `ethnicity`, `currentLocation`, `geographicLocation` | absent — appear nowhere in all 191 spec files | Accepted, reported as success, **silently discarded**. Web editor only. |
 | 4 | `relatedPersons`, `plots` | absent | Do not exist on any template tried. Web-editor labels, not API fields. |
 | 5 | Per-template schemas | only `article.yml` and `location.yml` are published | Every other template's fields must be established by probing |
+| 6 | Block `folderId` | `readOnly` | Writable. Accepts a UUID and persists it — the only way to file a block into a web-editor folder |
+| 7 | Block folder on write | `folder: { id }` | Ignored. The field is `blockfolder: { id }`, and its id is a BlockFolder integer — a UUID there returns a **500 HTML page** |
+| 8 | Block `RPGSRD` | required on create | Ignored; the block inherits its template's system |
+| 9 | `/world/blocks` | absent from the spec | Exists and works — but is denied on some worlds. See below |
 
 Multi-valued reference fields take a **comma-separated string**, not an array.
 An array is coerced to `"Array"` exactly as an object is.
@@ -37,7 +41,7 @@ that reading the spec would have caught.
 
 | Behaviour | Where |
 |---|---|
-| `/world/blocks` does not exist. Blocks are listed per folder via `/blockfolder/blocks`; a Block has no `world` field at all, only `author` and `blockfolder` | root spec paths |
+| A Block has no `world` field at all, only `author`, `blockfolder` and `folderId` | `schemas/block.yml` |
 | `category: "-1"` on `/world/articles` means *uncategorised*, not *unfiltered*. Omit the key to list everything | `world-articles.yml` description |
 | `templateType` and `world` are **required** on article create | `ArticleGenericCreate.required` |
 | `folderId` and `timeline` are `readOnly` | `schemas/article.yml` |
@@ -47,7 +51,10 @@ that reading the spec would have caught.
 | Behaviour | Detail |
 |---|---|
 | Blocks have no `content` field | The payload lives in `textualdata` (dataParser `yaml`), `tabulardata` (csv) or `jsondata` (json) |
-| Block folder field is `blockfolder` | Not `folder`. Sending `folder` leaves the block unfiled — and an unfiled block cannot be enumerated |
+| Block folder field is `blockfolder` | Not `folder`. Sending `folder` leaves the block unfiled |
+| A Block has **two** unrelated folder fields | `blockfolder` (integer BlockFolder, made by this API, enumerable via `/blockfolder/blocks`) and `folderId` (UUID, made by the web editor, enumerable by nothing). A block filed under one reads `-1`/`null` for the other, which reads exactly like a dropped write |
+| Block `tags` is a comma-separated string | An array becomes the literal `"Array"` — and the write response **echoes the array back**, so it looks like it worked until you re-read the block. The entity's `tags` is unrelated to the `tags:` key inside a block payload |
+| Blocks are created `state: "public"` | Not inherited from the world, and not asked for |
 | Two article serialisations | `PUT`/`GET granularity=2` return a `category` object with `folderId` parked at `-1`; `PATCH` returns no `category` and puts the category id in `folderId`, where `-1` genuinely means the world root |
 | `timeline` rejects with 422 | *"Tried to update association from owned side"* — set it from the timeline side |
 | Never Markdown-convert structured data | Block payloads are YAML/CSV/JSON. The converter turns a leading `---` into `[hr]` and YAML sequences into `[ul][li]` |
@@ -97,9 +104,14 @@ See ISSUES.md #4. Treat any agent-driven write as capable of publishing.
 
 ## Still open
 
-- **`/world/blocks` returns 403** rather than 404, so the route exists but is
-  denied. Whether a direct `WA_APP_KEY` succeeds where the shared proxy key
-  does not is untested — see *Blocked on an application key* in `ISSUES.md`.
+- **`/world/blocks` is denied on some worlds and not others.** One token, proxy
+  mode, same afternoon: 137 blocks on a public world, `403 access_denied` on a
+  private one. Not the RPG system (both have one) and not emptiness (the private
+  world still 403d once it held blocks). It is the only route that enumerates
+  blocks filed in the web editor, so the fallback is not equivalent.
+- **Whether a written `folderId` files a block where the web editor shows it**
+  is unverified — nothing reads the UUID back except the block. Check the first
+  one by eye.
 - **Rendering is unverified** for entity references. The values persist and
   round-trip, but whether World Anvil resolves them into working links in the
   rendered article can only be confirmed by eye in the web editor.

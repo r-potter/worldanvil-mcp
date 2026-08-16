@@ -66,15 +66,37 @@ statblock takes one call.
 
 The same defect appeared twice more nearby: `create_block` sent `folder`
 where the field is `blockfolder`, so `folder_id` never worked and every block
-landed unfiled — and an unfiled block cannot be enumerated, because listing
-goes through `/blockfolder/blocks`. Both create and update now file correctly.
+landed unfiled. Both create and update now file correctly.
 
 `list_blocks` calls `/world/blocks`, which is absent from the published API
-surface and returns 403 on every call tested. Kept, but the 403 is translated
-into an error naming the working path (folders, then blocks per folder).
+surface but works — on some worlds. Kept; the 403 is translated into an error
+saying the request is not at fault and naming the fallback and its limits.
 
 **Upstream-worthy: yes**, unreservedly. ISSUES.md #3a — note that the issue's
 own diagnosis and suggested fix were both wrong, corrected in place.
+
+## 3b. Block tags, and both kinds of block folder
+
+**Files:** `src/handlers.js` · `src/tools.js` · `src/api-client.js` ·
+`test/blocks.test.js`
+
+The other half of the same tool, from ISSUES.md #11. `tags` had no parameter at
+all, and `folder_id` was typed `number` while the folders a real world already
+uses are UUIDs — so a block created here could not be made to match the blocks
+beside it.
+
+A Block carries two unrelated folder fields: `blockfolder` (integer BlockFolder,
+created through this API, enumerable via `/blockfolder/blocks`) and `folderId`
+(UUID, created by the web editor, enumerable by nothing). Each reads back empty
+in the other's world, which looks exactly like a dropped write. `folder_id` now
+accepts either and routes by shape — a UUID sent as `blockfolder.id` returns a
+500. `folderId` is `readOnly` in the vendor spec and is not.
+
+`tags` accepts a string or an array and always sends the comma-separated string
+the entity stores; an array reaches the API as the literal `"Array"` while the
+write response echoes the array back.
+
+**Upstream-worthy: yes**, unreservedly — the same class of defect as 3a.
 
 ## 4. One answer for an article's category
 
@@ -165,11 +187,13 @@ is a decision to take deliberately rather than by default. A stale copy also
 invites trusting it over live behaviour, which is exactly the mistake it
 causes: see API-QUIRKS.md for where it is wrong.
 
-It independently confirms three things this fork relies on: there is no
-`/world/blocks` endpoint (#3); `folderId` and `timeline` are `readOnly` (#4);
-`templateType` and `world` are required on create (#5). The per-template
-schemas are not published — `parts/article/schemas/report.yml` and friends
-return 403 — so template-specific fields still have to be established by
+It independently confirms two things this fork relies on: `timeline` is
+`readOnly` (#6), and `templateType` and `world` are required on create (#5). It
+is also wrong in ways that cost time if trusted: it omits `/world/blocks`, which
+exists and works; it marks `folderId` `readOnly`, and on a Block it is writable
+(#3b); and it names the block folder write field `folder`, which is ignored. The
+per-template schemas are not published — `parts/article/schemas/report.yml` and
+friends return 403 — so template-specific fields still have to be established by
 probing.
 
 ## 9. Recorded test fixture
