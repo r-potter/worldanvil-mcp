@@ -94,6 +94,41 @@ Tests in `test/list-articles.test.js`.
 
 **3a. `update_block` discards statblock content.** Passing content to a statblock block returns success and changes nothing. Worked around by generating payloads for manual paste.
 
+> **Status — fixed and verified against Sandbox on 2026-08-16. The diagnosis
+> above was wrong, and so was the suggested fix.**
+>
+> Nothing "discards" anything and the write path was never broken.
+> `update_block` was building its payload out of a field that does not exist:
+> **a Block has no `content` field at all.** Its payload lives in one of three
+> fields selected by the block's `dataParser`:
+>
+> ```
+> dataParser:   "yaml"
+> textualdata:  "hit_points_current: '5'\nconditions: dead\n..."
+> tabulardata:  null      # csv
+> jsondata:     null      # json
+> ```
+>
+> The API accepted `{ content: ... }`, ignored the unknown key, and returned
+> `success: true` — correctly, from its point of view.
+>
+> **A second, independent bug sat behind it.** The handler ran
+> `markdownToBBCode()` over the payload. Block data is YAML/CSV/JSON, not
+> prose, and the converter mangles it: a leading `---` becomes `[hr]`, and YAML
+> sequences become `[ul][li]`. So even with the field name corrected, the
+> payload would have been corrupted in transit. Both fields are now sent
+> verbatim.
+>
+> The fix is therefore to make the write *work*, not — as suggested under
+> **Fix** below — to make it error. Sending `content` now raises an error
+> naming the correct parameter, but that is the smaller half.
+>
+> `create_block` accepts a payload too, and never offered one; it now does, so
+> a populated statblock takes one call instead of two. The
+> generate-for-manual-paste workaround is no longer needed.
+>
+> Tests in `test/blocks.test.js`.
+
 **3b. Entity-reference fields accept plain strings.** `ethnicity` and `species` on the Person template want a link to an article. Passing a string returns `success: true` and changes nothing at all. Any field of this kind likely behaves the same way; the list should be established rather than discovered one at a time.
 
 **3c. Wrong link prefixes resolve nowhere.** `@[Display](type:ID)` requires the prefix to match the target's entity class — `person:`, `organization:`, `article:`, `location:`. A mismatched prefix produces a link that looks correct and goes nowhere, with no error. Known entity classes should be validated, and an unknown or mismatched one should raise.

@@ -1279,19 +1279,49 @@ export function getToolDefinitions() {
             type: "number",
             description: "Optional BlockFolder ID to organize the block",
           },
+          textualdata: {
+            type: "string",
+            description:
+              "Optional payload for blocks whose dataParser is 'yaml' (the common case). Sent verbatim, no Markdown conversion.",
+          },
+          tabulardata: {
+            type: "string",
+            description:
+              "Optional payload for blocks whose dataParser is tabular/csv. Sent verbatim.",
+          },
+          jsondata: {
+            type: "string",
+            description:
+              "Optional payload for blocks whose dataParser is 'json'. Sent verbatim; an object is serialised for you.",
+          },
         },
         required: ["title", "template_id"],
       },
     },
     {
       name: "worldanvil_update_block",
-      description: "Update an existing block",
+      description:
+        "Update an existing block (statblock). A block's payload is structured data, not prose — it lives in textualdata, tabulardata or jsondata according to the block's dataParser, and is stored verbatim with no Markdown/BBCode conversion. Call worldanvil_get_block first to read dataParser and the current payload.",
       inputSchema: {
         type: "object",
         properties: {
-          block_id: { type: "string" },
-          title: { type: "string" },
-          content: { type: "string" },
+          block_id: { type: "string", description: "Block ID" },
+          title: { type: "string", description: "New block title" },
+          textualdata: {
+            type: "string",
+            description:
+              "Payload for blocks whose dataParser is 'yaml' (the common case). Sent verbatim — supply valid YAML matching the block template's field keys.",
+          },
+          tabulardata: {
+            type: "string",
+            description:
+              "Payload for blocks whose dataParser is tabular/csv. Sent verbatim.",
+          },
+          jsondata: {
+            type: "string",
+            description:
+              "Payload for blocks whose dataParser is 'json'. Sent verbatim; an object is serialised for you.",
+          },
         },
         required: ["block_id"],
       },

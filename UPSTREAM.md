@@ -9,7 +9,7 @@ decision from the diff.
 | **Upstream** | [wlcarden/worldanvil-claude-plugin](https://github.com/wlcarden/worldanvil-claude-plugin) (npm `worldanvil-mcp`) |
 | **This fork** | `git@github.com:r-potter/worldanvil-mcp.git` |
 | **Fork point** | `f8243b6` — *fix: green CI before v1.12.0 publish*, v1.12.0, 2026-06-01 |
-| **Local commits** | 3 |
+| **Local commits** | 4 |
 
 Regenerate the authoritative list at any time:
 
@@ -52,7 +52,22 @@ the tool for deliberate filtering.
 **Upstream-worthy: yes**, unreservedly — a plain defect with a one-line fix and
 no local preference in it. ISSUES.md #2.
 
-## 3. Local documentation
+## 3. `update_block` writes the field a Block actually has
+
+**Files:** `src/handlers.js` · `src/tools.js` · `test/blocks.test.js`
+
+A Block has no `content` field; its payload lives in `textualdata` /
+`tabulardata` / `jsondata`, selected by `dataParser`. `update_block` sent
+`content`, which the API ignored while returning `success: true` — and ran
+Markdown→BBCode over it first, which corrupts YAML (`---` → `[hr]`, `- item` →
+`[ul][li]`). Both are fixed: the real fields are exposed and sent verbatim,
+`content` now raises, and `create_block` can carry a payload so a populated
+statblock takes one call.
+
+**Upstream-worthy: yes**, unreservedly. ISSUES.md #3a — note that the issue's
+own diagnosis and suggested fix were both wrong, corrected in place.
+
+## 4. Local documentation
 
 **Files:** `CLAUDE.md` (`## Testing`, `## The Auth Token`) · `ISSUES.md`
 
@@ -63,7 +78,7 @@ driving the server against a live world.
 IDs. ISSUES.md marks per-issue which findings are worth reporting upstream
 independently of this fork.
 
-## 4. Recorded test fixture
+## 5. Recorded test fixture
 
 **File:** `test/fixtures/article-write-response.json`
 

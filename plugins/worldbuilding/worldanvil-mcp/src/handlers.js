@@ -619,20 +619,59 @@ export async function handleToolCall(name, args, client) {
           }),
         );
 
-      case "worldanvil_create_block":
-        return jsonResponse(
-          await client.createBlock({
-            title: args.title,
-            template: { id: args.template_id }, // Requires a valid BlockTemplate ID
-            folder: args.folder_id ? { id: args.folder_id } : undefined,
-          }),
-        );
+      case "worldanvil_create_block": {
+        const data = {
+          title: args.title,
+          template: { id: args.template_id }, // Requires a valid BlockTemplate ID
+          folder: args.folder_id ? { id: args.folder_id } : undefined,
+        };
+        // Same payload fields as update_block, and equally verbatim. Supplying
+        // one here saves a second call to populate a newly created block.
+        for (const field of ["textualdata", "tabulardata", "jsondata"]) {
+          if (args[field] === undefined) continue;
+          data[field] =
+            typeof args[field] === "string"
+              ? args[field]
+              : JSON.stringify(args[field]);
+        }
+        return jsonResponse(await client.createBlock(data));
+      }
 
       case "worldanvil_update_block": {
         const data = {};
         if (args.title !== undefined) data.title = args.title;
-        if (args.content !== undefined)
-          data.content = markdownToBBCode(args.content);
+
+        // A Block has no `content` field. Its payload lives in textualdata,
+        // tabulardata or jsondata, chosen by the block's `dataParser`. Sending
+        // `content` returned success and wrote nothing — refuse it loudly
+        // rather than repeat that.
+        if (args.content !== undefined) {
+          throw new Error(
+            "Blocks have no `content` field. The payload lives in `textualdata` " +
+              "(dataParser: yaml), `tabulardata` (csv) or `jsondata` (json). Call " +
+              "worldanvil_get_block to read the block's dataParser, then pass the " +
+              "matching parameter instead.",
+          );
+        }
+
+        // Block payloads are YAML, CSV or JSON — structured data, never prose.
+        // Markdown conversion would rewrite YAML sequences as [ul][li] and a
+        // leading `---` as [hr], so these fields are sent verbatim.
+        for (const field of ["textualdata", "tabulardata", "jsondata"]) {
+          if (args[field] === undefined) continue;
+          data[field] =
+            typeof args[field] === "string"
+              ? args[field]
+              : JSON.stringify(args[field]);
+        }
+
+        if (Object.keys(data).length === 0) {
+          throw new Error(
+            "Nothing to update: pass `title`, or one of `textualdata`, " +
+              "`tabulardata`, `jsondata`.",
+          );
+        }
+
         return jsonResponse(await client.updateBlock(args.block_id, data));
       }
 
