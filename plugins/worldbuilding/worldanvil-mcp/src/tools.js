@@ -139,7 +139,7 @@ export function getToolDefinitions() {
           template: {
             type: "string",
             description:
-              'Required. The template type for the article — the API rejects a create without it. Use "article" for generic articles, or a specific type: law, species, ethnicity, material, document, technology, organization, location, character, item, etc. Templates cannot be changed later without losing template-specific fields, so choose deliberately.',
+              'Required — the API rejects a create without it, and accepts only these exact values: article, person, species, ethnicity, condition, settlement, location, landmark, organization, formation, militaryConflict, item, material, vehicle, technology, language, myth, ritual, profession, rank, law, spell, document, prose, plot, report. Note the display names differ: a character is "person", a geographic location is "location", a session report is "report", and militaryConflict is the only camelCase value. The template cannot be changed later without losing template-specific fields, so choose deliberately.',
           },
           content: {
             type: "string",

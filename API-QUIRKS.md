@@ -56,17 +56,30 @@ that reading the spec would have caught.
 
 ### Valid `templateType` values
 
-Confirmed by creating one of each. The list in
-`plugins/worldbuilding/worldanvil-mcp/CLAUDE.md` names several that do not
-exist.
+Confirmed by creating one article of each against a live world; the API
+publishes no enum, and `schemas/article.yml` carries only `enum: [ article ]`
+for the generic case.
 
-**Accepted:** `article`, `person`, `report`, `plot`, `settlement`,
-`organization`, `location`, `landmark`, `item`, `species`, `ethnicity`,
-`condition`, `material`, `vehicle`, `technology`, `language`, `myth`, `ritual`,
-`profession`, `rank`, `document`, `prose`, `spell`
+**Accepted (26):** `article`, `person`, `species`, `ethnicity`, `condition`,
+`settlement`, `location`, `landmark`, `organization`, `formation`,
+`militaryConflict`, `item`, `material`, `vehicle`, `technology`, `language`,
+`myth`, `ritual`, `profession`, `rank`, `law`, `spell`, `document`, `prose`,
+`plot`, `report`
 
-**Rejected with 422:** `geography`, `building`, `naturallaw`, `title`,
-`conflict`, `militaryformation`
+`militaryConflict` is **the only camelCase value**; everything else is
+lowercase. Casing is checked — `militaryconflict` is rejected.
+
+**Rejected with 422**, including several that read like obvious guesses:
+`character`, `geography`, `building`, `conflict`, `militaryformation`,
+`militaryFormation`, `naturallaw`, `naturalLaw`, `title`, `titlerank`,
+`tradition`, `generic`, `creature`, `monster`, `race`, `faction`, `religion`,
+`event`, `quest`, `encounter`, `npc`, `deity`, `war`, `battle`,
+`geographicLocation`, `sessionReport`
+
+The display names in the web editor are frequently *not* the API value:
+Character is `person`, Geographic Location is `location`, Building/Landmark is
+`landmark`, Session Report is `report`, Military Formation is `formation`,
+Tradition/Ritual is `ritual`, Rank/Title is `rank`.
 
 ---
 

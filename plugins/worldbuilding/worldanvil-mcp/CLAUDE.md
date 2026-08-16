@@ -309,7 +309,53 @@ GOOD: Variables are for articles only
 
 ## Articles: Template Selection Guide
 
-WorldAnvil provides 28 specialized article templates. Choosing the right template unlocks template-specific fields, relationships, and features that enhance your worldbuilding.
+WorldAnvil provides a set of specialized article templates. Choosing the right template unlocks template-specific fields, relationships, and features that enhance your worldbuilding.
+
+### The `template` values the API accepts
+
+**Pass one of these exact strings.** `template` is required on
+`worldanvil_create_article`, and anything not on this list is rejected with a
+422. The web editor's display names are often *not* the API value — "Character"
+is `person`, "Geography" is `location`, "Session Report" is `report`.
+
+| Display name | `template` value |
+|---|---|
+| Generic Article | `article` |
+| Character | `person` |
+| Species | `species` |
+| Ethnicity | `ethnicity` |
+| Condition | `condition` |
+| Settlement | `settlement` |
+| Geographic Location | `location` |
+| Building / Landmark | `landmark` |
+| Organization | `organization` |
+| Military Formation | `formation` |
+| Military Conflict | `militaryConflict` |
+| Item | `item` |
+| Material | `material` |
+| Vehicle | `vehicle` |
+| Technology | `technology` |
+| Language | `language` |
+| Myth / Legend | `myth` |
+| Tradition / Ritual | `ritual` |
+| Profession | `profession` |
+| Rank / Title | `rank` |
+| Law | `law` |
+| Spell | `spell` |
+| Document | `document` |
+| Prose | `prose` |
+| Plot | `plot` |
+| Session Report | `report` |
+
+Note `militaryConflict` is the only camelCase value; every other one is
+lowercase. Established by creating one article of each against a live world —
+the API publishes no enum. **Rejected**, despite reading like plausible
+guesses: `character`, `geography`, `building`, `conflict`, `militaryformation`,
+`naturallaw`, `naturalLaw`, `title`, `tradition`, `generic`, `creature`,
+`faction`, `religion`, `event`, `quest`.
+
+A template cannot be changed later without losing template-specific fields, so
+choose deliberately.
 
 ### Template Selection Decision Tree
 
@@ -318,93 +364,101 @@ WorldAnvil provides 28 specialized article templates. Choosing the right templat
 │                 ARTICLE TEMPLATE DECISION TREE                  │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
+│  Values shown are the exact `template` strings to pass.         │
+│                                                                 │
 │  Is this about a PERSON or CREATURE?                            │
-│    Person (individual)     → Character                          │
-│    Type of being/race      → Species                            │
-│    Cultural group of people → Ethnicity                         │
-│    Creature type/monster   → Species (with creature fields)     │
+│    Person (individual)      → person                            │
+│    Type of being/race       → species                           │
+│    Cultural group of people → ethnicity                         │
+│    Creature type/monster    → species                           │
+│    Disease/curse/affliction → condition                         │
 │                                                                 │
 │  Is this about a PLACE?                                         │
-│    Natural feature         → Geography                          │
-│    Inhabited place         → Settlement                         │
-│    Single structure        → Building / Landmark                │
-│    Cosmic/planar location  → Geography                          │
+│    Natural feature          → location                          │
+│    Inhabited place          → settlement                        │
+│    Single structure         → landmark                          │
+│    Cosmic/planar location   → location                          │
 │                                                                 │
 │  Is this about a GROUP?                                         │
-│    Political/religious/guild → Organization                     │
-│    Military unit           → Military Formation                 │
-│    Cultural group          → Ethnicity                          │
-│    Noble house/family      → Organization (family fields)       │
+│    Political/religious/guild → organization                     │
+│    Military unit            → formation                         │
+│    Cultural group           → ethnicity                         │
+│    Noble house/family       → organization                      │
 │                                                                 │
 │  Is this about a THING?                                         │
-│    Specific object/artifact → Item                              │
-│    Type of material        → Material                           │
-│    Vehicle/ship            → Vehicle                            │
-│    Technology/invention    → Technology                         │
+│    Specific object/artifact → item                              │
+│    Type of material         → material                          │
+│    Vehicle/ship             → vehicle                           │
+│    Technology/invention     → technology                        │
 │                                                                 │
 │  Is this about IDEAS/SYSTEMS?                                   │
-│    How magic/physics works → Natural Law                        │
-│    Language/writing system → Language                           │
-│    Religion/belief         → Organization (religious type)      │
-│    Custom/ritual/practice  → Tradition / Ritual                 │
-│    Job/role in society     → Profession / Rank                  │
-│    Noble/official title    → Title / Rank                       │
+│    How magic/physics works  → law                               │
+│    Legal code/statute       → law                               │
+│    Language/writing system  → language                          │
+│    Religion/belief          → organization                      │
+│    Custom/ritual/practice   → ritual                            │
+│    Job/role in society      → profession                        │
+│    Noble/official title     → rank                              │
+│    Magic spell/formula      → spell                             │
 │                                                                 │
 │  Is this about STORY/EVENTS?                                    │
-│    Historical event        → Document / Prose                   │
-│    War/battle              → Conflict (Military)                │
-│    Plot/quest/adventure    → Plot                               │
-│    In-world document       → Document                           │
-│    Myth/legend             → Myth / Legend                      │
-│    Campaign session notes  → Session Report                     │
+│    Historical event         → document or prose                 │
+│    War/battle               → militaryConflict                  │
+│    Plot/quest/adventure     → plot                              │
+│    In-world document        → document                          │
+│    Myth/legend              → myth                              │
+│    Campaign session notes   → report                            │
 │                                                                 │
-│  None of the above?        → Generic Article                    │
+│  None of the above?         → article                           │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Template Categories Overview
 
-| Category | Templates | Use For |
+| Category | `template` values | Use For |
 |----------|-----------|---------|
-| **Characters** | Character | Individual NPCs, PCs, historical figures |
-| **Places** | Settlement, Building/Landmark, Geography | Cities, structures, natural features |
-| **Groups** | Organization, Ethnicity, Military Formation | Factions, cultures, armies |
-| **Creatures** | Species, Condition | Races, monsters, diseases/curses |
-| **Culture** | Tradition/Ritual, Language, Myth/Legend | Customs, scripts, folklore |
-| **Objects** | Item, Material, Vehicle, Technology | Artifacts, substances, ships, inventions |
-| **Systems** | Natural Law, Profession/Rank, Title/Rank | Magic systems, jobs, noble titles |
-| **Story** | Plot, Document, Session Report, Conflict, Prose | Adventures, events, campaign logs |
-| **Meta** | Generic Article | Primers, indexes, RPG rules, anything else |
+| **Characters** | `person` | Individual NPCs, PCs, historical figures |
+| **Places** | `settlement`, `landmark`, `location` | Cities, structures, natural features |
+| **Groups** | `organization`, `ethnicity`, `formation` | Factions, cultures, armies |
+| **Creatures** | `species`, `condition` | Races, monsters, diseases/curses |
+| **Culture** | `ritual`, `language`, `myth` | Customs, scripts, folklore |
+| **Objects** | `item`, `material`, `vehicle`, `technology` | Artifacts, substances, ships, inventions |
+| **Systems** | `law`, `profession`, `rank`, `spell` | Magic systems, statutes, jobs, noble titles |
+| **Story** | `plot`, `document`, `report`, `militaryConflict`, `prose` | Adventures, events, campaign logs |
+| **Meta** | `article` | Primers, indexes, RPG rules, anything else |
 
 ### Common Template Confusion Points
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    SETTLEMENT vs GEOGRAPHY                      │
+│                  `settlement` vs `location`                     │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  SETTLEMENT - Use for:                                          │
+│  settlement - Use for:                                          │
 │    • Cities, towns, villages, hamlets                           │
 │    • Nomadic camps (even if they move)                          │
 │    • Districts within cities                                    │
 │    • Space stations, underwater domes (if inhabited)            │
 │    Features: Demographics, government, maps, chronicles         │
 │                                                                 │
-│  GEOGRAPHY - Use for:                                           │
+│  location - Use for:                                            │
 │    • Mountains, rivers, forests, deserts                        │
 │    • Oceans, planets, planes of existence                       │
 │    • Ruins (unless actively inhabited)                          │
 │    • Uninhabited regions                                        │
 │    Features: Climate, natural resources, hazards                │
 │                                                                 │
-│  Rule of Thumb: "Do people LIVE there?" → Settlement            │
-│                 "Is it a natural feature?" → Geography          │
+│  Rule of Thumb: "Do people LIVE there?" → settlement            │
+│                 "Is it a natural feature?" → location           │
+│                                                                 │
+│  NOTE: the web editor calls this template "Geographic           │
+│  Location"; `geography` is NOT a valid template value.          │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│                  ORGANIZATION vs ETHNICITY                      │
+│                  `organization` vs `ethnicity`                  │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ORGANIZATION - Use for:                                        │
@@ -426,7 +480,7 @@ WorldAnvil provides 28 specialized article templates. Choosing the right templat
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│                    SPECIES vs ETHNICITY                         │
+│                    `species` vs `ethnicity`                     │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  SPECIES - Use for:                                             │
@@ -452,30 +506,30 @@ WorldAnvil provides 28 specialized article templates. Choosing the right templat
 Some templates unlock powerful features not available in Generic articles:
 
 ```
-CHARACTER
+person
   • Family trees with automatic relationship visualization
   • Portrait/token image slots for RPG integration
   • Relationship tracking (allies, enemies, affiliations)
 
-SETTLEMENT
+settlement
   • Map integration (link interactive maps)
   • Chronicle integration (timeline of events)
   • District hierarchy (parent/child settlements)
   • Demographics fields
 
-ORGANIZATION
+organization
   • Automatic hierarchy trees
   • Membership and rank structure
   • Founding/dissolution date tracking
   • Related organizations
 
-SPECIES
+species
   • Anatomy and biology fields
   • Lifespan and lifecycle
   • Trait inheritance tracking
   • Related species/subspecies
 
-PLOT
+plot
   • Act/scene structure
   • Stakes and hooks
   • Dramatic question framing
@@ -541,7 +595,9 @@ Step 2: Check Existing Content
   - Consider parent/child relationships (settlements, organizations)
 
 Step 3: Create Article
-  - Use worldanvil_create_article with appropriate template
+  - Use worldanvil_create_article with the appropriate template value
+    (see "The `template` values the API accepts" above — it is required,
+     and the display names are not the API values)
   - Fill template-specific fields (not just content)
   - Add to appropriate category for organization
 
@@ -594,7 +650,7 @@ Effective organization is what separates a usable world from an overwhelming dum
 │  │   │   ├── House Blackwood (Organization)                     │
 │  │   │   ├── House Redmont (Organization)                       │
 │  │   ├── Geography/                                             │
-│  │   │   ├── The Iron Mountains (Geography)                     │
+│  │   │   ├── The Iron Mountains (location)                      │
 │  │                                                              │
 │  BAD Structure (Too Flat):                                      │
 │  ├── Places/                                                    │
@@ -1003,8 +1059,8 @@ WorldAnvil's power comes from connecting content. This section covers how to lin
 │    → Organization contains sub-organizations                    │
 │                                                                 │
 │  TEMPLATE RELATIONSHIPS                                         │
-│    → Character → Species, Ethnicity, Organization               │
-│    → Settlement → Geography (location within)                   │
+│    → person → species, ethnicity, organization                  │
+│    → settlement → location (located within)                     │
 │    → Item → Material, Technology                                │
 │                                                                 │
 │  TIMELINE CONNECTIONS                                           │
@@ -1177,7 +1233,7 @@ MAP INTEGRATION
 Marker → Article connections:
   • City marker → Settlement article
   • Dungeon marker → Location article
-  • Battle marker → Conflict article
+  • Battle marker → militaryConflict article
 
 POWER USER TIP (from Cathedris):
   → Use custom marker icons for different article types
