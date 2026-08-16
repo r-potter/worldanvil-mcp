@@ -182,6 +182,60 @@ Original note: `ethnicity` and `species` on the Person template want a link to a
 
 ---
 
+### Status — investigated 2026-08-16. **The premise is wrong, and the safety property does not hold.**
+
+**Both fields are fully settable through the API.** This is not a side effect
+of the `"Array"` coercion in issue 6 or of any other shape problem — they
+simply were never exposed by this server.
+
+| | verified against Sandbox |
+|---|---|
+| `state` on create *and* update | settable; `enum: [public, private]`, and **not** `readOnly` in the vendor spec |
+| `subscribergroups: [{ id }]` | settable, including several groups at once |
+| `subscribergroups: "uuid"` | silently ignored |
+
+Note this **inverts** the shape rule from issue 6: for `subscribergroups` the
+documented array-of-objects is correct and the bare string fails silently,
+the opposite way round from `articleNext`. Shapes are per-field; there is no
+general rule to lean on.
+
+#### *"Nothing is published as a side effect"* is not mechanically true
+
+Two holes, neither of which required anything exotic to find:
+
+1. **`fields` is an arbitrary passthrough.** `create_article` and
+   `update_article` do `Object.assign(data, convertFieldsToBBCode(args.fields))`,
+   so `fields: { state: "public" }` publishes. Confirmed live through the MCP
+   server: the article came back `state=public`. The absent `state` parameter
+   never prevented publication — it only made it non-obvious.
+   (`subscribergroups` happens to be blocked, but only by the scalar guard
+   added for issue 6, and incidentally rather than by design.)
+
+2. **`state` is already exposed outright on eight tools** —
+   `create`/`update` for `marker`, `timeline`, `era` and `history`, each with
+   `enum: ["public", "private"]` in its schema.
+
+So the property holds only for articles, categories and secrets, and only
+against a caller that does not touch `fields`.
+
+#### Decided, not yet built
+
+Nothing was changed in this pass — deliberately, since the guard design was
+reserved. The agreed direction is that `state` and `subscribergroups` **should**
+become first-class parameters on the article tools, **behind a guard**, rather
+than staying absent while remaining reachable through `fields`.
+
+The guard has to come first, because it does not exist yet. The options
+sketched at the top of this issue still stand; a server-level setting that
+defaults to refusing is the only one that also covers the `fields` passthrough
+and the eight tools above without being added per tool.
+
+**Until then, treat any agent-driven write as capable of publishing.** A world
+holding material that must never become public is not protected by this server
+today.
+
+---
+
 
 ---
 

@@ -83,6 +83,18 @@ Tradition/Ritual is `ritual`, Rank/Title is `rank`.
 
 ---
 
+## Publication is reachable, and not guarded
+
+`state` (`enum: [public, private]`) and `subscribergroups` are both settable,
+on create and on update. `state` is not `readOnly` in the spec.
+
+This server does not expose `state` on the article tools, but that is not a
+guard: `fields` is an arbitrary passthrough, so `fields: { state: "public" }`
+publishes. `state` is also exposed outright on `create`/`update` for `marker`,
+`timeline`, `era` and `history`.
+
+See ISSUES.md #4. Treat any agent-driven write as capable of publishing.
+
 ## Still open
 
 - **`/world/blocks` returns 403** rather than 404, so the route exists but is
