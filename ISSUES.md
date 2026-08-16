@@ -56,9 +56,6 @@ The `folderId: -1` in the compacted output is issue 8 and is left alone.
 
 ---
 
-
----
-
 ## 2. `list_articles` does not list articles — *upstream: yes*
 
 **Symptom.** Called on a world with dozens of articles it returned exactly **one** — the single article sitting in the world root — and returned it regardless of `limit`, with an empty result at any `offset`.
@@ -90,9 +87,6 @@ the root with `"-1"` — is available deliberately rather than by accident. The
 `get_category` walkaround is no longer necessary.
 
 Tests in `test/list-articles.test.js`.
-
----
-
 
 ---
 
@@ -167,9 +161,6 @@ Original note: `ethnicity` and `species` on the Person template want a link to a
 
 ---
 
-
----
-
 ## 4. `state` and `subscribergroups` cannot be set — *decision, not a defect*
 
 **Symptom.** Absent from `create_article`, `create_category`, `update_category` and `create_secret`. Every publication therefore ends in manual work in the web editor.
@@ -236,9 +227,6 @@ today.
 
 ---
 
-
----
-
 ## 5. Field length caps return raw SQL, and roll back their neighbours — *upstream: yes*
 
 **Symptom.** An over-length value on a capped field — `currentstatus` is 255 — returns a **422 carrying `Data too long for column`**, a raw database error rather than anything a caller can act on.
@@ -246,9 +234,6 @@ today.
 **The worse half.** The update is a single statement, so **every other field in the same call is rolled back with it.** A long value in one field silently discards the correct values sent alongside it.
 
 **Fix.** Validate lengths client-side before sending and report *which* field failed and by how much. Failing that, at minimum translate the SQL error into something readable.
-
----
-
 
 ---
 
@@ -322,9 +307,6 @@ Tests in `test/references.test.js`.
 
 ---
 
-
----
-
 ## 7. 30-second timeout on large multi-field calls — *upstream: investigate*
 
 **Symptom.** A call setting four or five long fields timed out at 30 seconds.
@@ -332,9 +314,6 @@ Tests in `test/references.test.js`.
 **Mitigating detail.** When it fired, the write had landed **nothing** — `updateDate` was unchanged — so a timeout is safe to retry. But that is only knowable by reading the article back, and a timeout is otherwise indistinguishable from a partial write.
 
 **Fix.** Establish whether the timeout is client-side and configurable. Either way the error should say whether anything was committed.
-
----
-
 
 ---
 
@@ -394,6 +373,62 @@ failure reads as a sentence rather than a stack trace. Marking it required
 rather than defaulting to `"article"` was deliberate: a template cannot be
 changed later without losing template-specific fields, so a silent default
 would quietly commit the caller to the wrong one.
+
+---
+
+## 10. Field-selective `get_article` / `update_article` — *upstream: yes*
+
+**Not yet built.** Recorded 2026-08-16.
+
+**Want.** A pair of article read/write calls that take an explicit list of
+field names and return only those fields. Reading one value out of an article
+should not cost the whole entity.
+
+**Why it is not already covered by issue 1.** `compactEntity()` is wired into
+`create_article` and `update_article` only. `get_article` is untouched and
+returns everything — and reading is the more common operation. Compaction also
+only removes *empty* fields; it cannot express "just the title and content",
+because a populated field is by definition worth keeping under that rule.
+
+**Measured** against a real Person article (`get_article`, Sandbox):
+
+| `granularity` | bytes | keys | `content` present |
+|---|---|---|---|
+| `-1` | 456 | 15 | no |
+| `0` | 3,132 | 138 | no |
+| `1` | 9,454 | 144 | **yes** |
+| `2` (current default) | 11,031 | 202 | yes |
+| `3` | 11,868 | 204 | yes |
+
+**Design notes, from those numbers:**
+
+- **`granularity` is the only server-side lever and it is coarse.** There is no
+  field selection in the API, so the filtering has to happen client-side. That
+  saves tokens — the thing that actually costs — but not bandwidth or latency.
+  Worth being explicit about in the tool description so nobody expects
+  otherwise.
+- **`granularity=-1` is a genuine bargain at 456 bytes** and is not exposed at
+  all today. It answers "does this exist, what is it called, what is its URL"
+  for 4% of the current cost. Probably deserves its own thin tool, or a
+  documented `fields` shorthand, independent of the general mechanism.
+- **Drop the default to `granularity=1` when `content` is wanted** and `2` only
+  when a template-specific field is asked for: 9,454 vs 11,031 bytes for the
+  same content. Check first which fields vanish between 1 and 2 — 58 keys do,
+  and some are template fields callers will legitimately want.
+- **Always return `id`**, and probably `title`, whatever is asked for.  A
+  response the caller cannot identify is a false economy.
+- **An unknown field name must error, naming the article's template.** Field
+  names are template-dependent (a `report` has `relatedReports`, a `person` has
+  `species`), so a typo would otherwise return an empty object and look like an
+  empty article. That is the failure mode this whole file is about; the new
+  tool should not add another instance of it.
+- **Compose with `verbose`, do not fight it.** `verbose: true` already means
+  "give me the raw entity"; an explicit field list should win over both
+  compaction and verbose, or the precedence needs stating.
+
+**For `update_article`**, the equivalent is echoing back only the fields that
+were written, which is what a caller checks after a write. The compacted
+response already approximates this, but by accident rather than by contract.
 
 ---
 
