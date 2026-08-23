@@ -60,6 +60,7 @@ that reading the spec would have caught.
 | `timeline` rejects with 422 | *"Tried to update association from owned side"* — set it from the timeline side |
 | Never Markdown-convert structured data | Block payloads are YAML/CSV/JSON. The converter turns a leading `---` into `[hr]` and YAML sequences into `[ul][li]` |
 | Rate limiting | Space calls ~750ms apart; Cloudflare returns 429 otherwise |
+| List endpoints cap a page at 50 | A larger `limit` is accepted and silently reduced — asking for 400 returns 50, with nothing to say the result is partial. Page with `offset` until a short page comes back. Fallen London holds 402 blocks; a single unpaged call shows 50 of them and looks complete |
 | `/variablecollection` | Spec shows `/variable_collection`; the live API uses no underscore |
 
 ### Valid `templateType` values

@@ -618,8 +618,15 @@ simply never sent.
 on the same reasoning as issue 9: the failure is undetectable after the fact, so
 a default would quietly commit the caller to the wrong answer. It is also
 exposed on `update_block`, which **adopts an orphan** — verified: a block created
-without a world was absent from the listing, then present after one `PATCH`. So
-**`1687174` is salvageable**; adopt it rather than recreating it.
+without a world was absent from the listing, then present after one `PATCH`.
+
+**`1687174` has since been adopted**, not recreated. One `update_block` with
+`world_id` put it into Fallen London, and `list_blocks` now shows it in its
+correct alphabetical position between *Destiny* and *Discorporate*, still
+carrying `folderId: 93837178-…` and `tags: spell-matter-1`. No block is
+orphaned, nothing had to be deleted, and **the 267-block spell import is no
+longer blocked** — provided it verifies by enumeration, per the paragraph
+below.
 
 **Nothing else associates a block with a world.** Filing into a world-scoped
 BlockFolder does not — a block in BlockFolder 42876, whose `world` is Sandbox,
