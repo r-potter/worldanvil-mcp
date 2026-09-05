@@ -178,6 +178,36 @@ That also explains ISSUES.md #3b: they were never a string-vs-object problem.
 **Upstream-worthy: yes.** ISSUES.md #6, whose field list was partly wrong —
 `relatedPersons` and `plots` do not exist on any template.
 
+## 6b. Articles and secrets can be gated to subscriber groups
+
+**Files:** `src/handlers.js` · `src/tools.js` · `test/subscribergroups.test.js`
+
+A `subscribergroups` parameter on both article write tools and both secret
+write tools, accepting a UUID, a `{ id }` object, or an array of either, and
+normalising to the `[{ id }]` shape the API actually writes. `[]` clears every
+group. One helper serves all four; the payload shape is identical.
+
+Secrets are the case where this currently changes anything: a bare secret
+create lands `state: private`, so its groups gate it immediately, while a bare
+article create lands `public` and ignores its groups until the state is changed
+in the web editor.
+
+Note this **inverts** the shape rule from divergence 6: here the documented
+array-of-objects is correct and the bare string is the one that fails. Shapes
+are per-field; the two cannot be reasoned about together.
+
+The bare string is refused rather than sent, because World Anvil answers
+`success: true` to it and **silently clears** the entity's groups — the failure
+runs toward *less* gating, so a fumbled shape un-gates something and reports
+success. Anything that is not a UUID is refused before the network. (The
+array-of-bare-strings shape errors rather than clearing: 422 on `/article`,
+a 500 HTML page on `/secret`.)
+
+`state` is deliberately **not** part of this — see *Deliberate non-changes*.
+
+**Upstream-worthy: yes**, though upstream may want it paired with a publication
+guard it does not have either. ISSUES.md #4.
+
 ## 7. Local documentation
 
 **Files:** `CLAUDE.md` (`## Testing`, `## The Auth Token`) · `ISSUES.md` ·
@@ -237,16 +267,31 @@ headers were recorded. See `CLAUDE.md#the-auth-token` before adding more.
 Things upstream might reasonably "fix" that this fork depends on staying as
 they are. Check these after any merge.
 
-**`state` and `subscribergroups` are not exposed** on `create_article`,
-`create_category`, `update_category` or `create_secret`. This is load-bearing:
-it makes *"nothing is published as a side effect"* mechanically true, which
-matters for a world holding material that must never become public. Verified
-2026-08-16 — mirroring a `public` Fallen London article into Sandbox produced a
-`private` article, because state simply cannot be carried.
+**`state` is not exposed** on `create_article`, `update_article`,
+`create_category`, `update_category` or `create_secret`. The intent is that
+*"nothing is published as a side effect"*, which matters for a world holding
+material that must never become public.
 
-If an upstream merge adds these parameters, the guard has to be re-established
-somewhere explicit before the merge lands. See ISSUES.md #4, deferred by
-decision rather than oversight.
+Be clear that this is an intent and not a mechanism: `fields` is an arbitrary
+passthrough, so `fields: { state: "public" }` publishes, and `state` is exposed
+outright on `create`/`update` for `marker`, `timeline`, `era` and `history`.
+The guard that would make it real is still undesigned. See ISSUES.md #4.
+
+`subscribergroups` **was** part of this restriction and no longer is — it is
+exposed on both article write tools and both secret write tools as of
+2026-09-05 (divergence 6b). Gating
+can only restrict who may read an article, so it was never what the publication
+guard was protecting against, and pairing the two only held the feature
+hostage. If an upstream merge adds `state`, the guard has to be established
+before the merge lands.
+
+**Correction, 2026-09-05.** This section previously claimed articles land
+`private` by default, on the evidence that mirroring a `public` Fallen London
+article into Sandbox produced a `private` one. That does not reproduce: three
+bare creates against Sandbox — two direct, one through the tool — all came back
+`state: "public"`. Whichever way the original observation arose, the default
+should not be relied on as a safety property. It has not been re-tested on a
+public world, where it would actually matter.
 
 ## Not diverged, though it may look it
 

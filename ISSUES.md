@@ -227,6 +227,66 @@ today.
 
 ---
 
+### Half done — 2026-09-05. `subscribergroups` is exposed; `state` is still not.
+
+The two fields were paired by the original issue, but they do not carry the
+same risk and have been split apart.
+
+**`subscribergroups` is now a first-class parameter** on `create_article`,
+`update_article`, `create_secret` and `update_secret`. It needs no publication
+guard, because gating can only ever *restrict* who can read an entity — there
+is no argument by which adding a subscriber group exposes anything. The
+reserved decision was about publication, and this is not that.
+
+**`state` remains unexposed, and the guard remains undesigned.** Everything
+above still stands: `fields: { state: "public" }` publishes, eight other tools
+take `state` outright, and no guard exists. Splitting the issue does not narrow
+that hole, it only stops an unrelated feature waiting behind it.
+
+#### The risk this parameter does carry is the inverse one
+
+The dangerous shape is the *bare string*: World Anvil answers `success: true`
+and **silently clears** the article's groups. The failure therefore runs toward
+less gating, not more — a caller who fumbles the shape un-gates an article and
+is told the write worked.
+
+So `buildSubscriberGroups` in `handlers.js` normalises every accepted shape to
+`[{ id }]` and refuses anything that is not a UUID **before the network**,
+rather than letting the API accept it. `[]` is honoured as an explicit clear.
+Verified live against Sandbox through the tools, 2026-09-05, for articles and
+again for secrets: create-with-groups, several groups at once, a bare UUID
+normalised rather than sent raw, an unrelated update leaving the groups intact,
+a refused bad shape leaving them intact, and `[]` clearing them.
+
+#### Secrets take the same field, and are the case where it bites
+
+Probed separately rather than assumed from the article behaviour — the vendor
+spec documents plenty this API does not honour, and on secrets it happens to be
+right. The payload shape is identical. Two differences, neither structural:
+
+- **A bare secret create lands `state: private`**, where an article lands
+  `public`. So a secret's groups gate it from the moment it exists, while an
+  article's are inert until someone changes the state in the web editor. If
+  subscriber-group gating is meant to *do* something through this server today,
+  secrets are where it does.
+- **The array-of-bare-strings shape returns a 500 HTML page** on `/secret`,
+  against a 422 with a Doctrine trace on `/article`. Refused before the network
+  either way.
+
+#### What Sandbox cannot establish
+
+Sandbox is a **private** world, so this proves only that the field *writes and
+reads back*. Whether the gating restricts real readers cannot be tested there —
+see CLAUDE.md on the public/private trap. Confirming the access control itself
+needs a public world, and Fallen London is not available for that.
+
+Related: gating is only consulted while `state` is `private`. A public article
+stays readable regardless of its groups, so on a public world the two fields
+have to be set together to gate anything — and `state` is the half this server
+still will not set.
+
+---
+
 ## 5. Field length caps return raw SQL, and roll back their neighbours — *upstream: yes*
 
 **Symptom.** An over-length value on a capped field — `currentstatus` is 255 — returns a **422 carrying `Data too long for column`**, a raw database error rather than anything a caller can act on.

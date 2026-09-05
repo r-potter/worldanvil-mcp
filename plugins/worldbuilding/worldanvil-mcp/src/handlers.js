@@ -151,6 +151,60 @@ function assertFieldsAreScalar(fields) {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
+ * Build the subscriber-group portion of an article or secret payload.
+ *
+ * Gating an entity to subscriber groups. Established against Sandbox on
+ * 2026-09-05, on PUT and PATCH of both /article and /secret:
+ *
+ *   [{ id: uuid }]   written; several groups at once works
+ *   []               clears every group
+ *   "uuid"           `success: true`, and silently CLEARS the groups
+ *   ["uuid"]         rejected — 422 with a raw Doctrine uuid conversion error
+ *                    on /article, a 500 HTML page on /secret
+ *
+ * Note this inverts the shape rule for reference fields above, where the
+ * array is the shape coerced to the literal text "Array" and only a bare
+ * string writes. Shapes are per-field; the two cannot be reasoned about
+ * together.
+ *
+ * The bare string is the dangerous one, and it fails in the direction that
+ * matters: it reports success while removing the gating the entity already
+ * had, so fumbling the shape un-gates it and the caller is told it worked.
+ * Every accepted shape is normalised to `[{ id }]` here, and anything that is
+ * not a UUID is refused before the network rather than sent.
+ *
+ * Only `state: private` actually consults these groups; a public entity is
+ * readable regardless. That distinction bites differently either side: a bare
+ * article create lands `public`, so groups on it restrict nothing until the
+ * state is changed in the web editor, while a bare secret create lands
+ * `private`, so groups on a secret apply immediately. `state` is deliberately
+ * not settable here on either. See ISSUES.md #4.
+ *
+ * @param {string|Object|Array} groups - UUID, { id }, or an array of either
+ * @returns {Object[]} `[{ id }]` objects; `[]` to clear every group
+ */
+function buildSubscriberGroups(groups) {
+  const list = Array.isArray(groups) ? groups : [groups];
+
+  return list.map((group) => {
+    const id = group && typeof group === "object" ? group.id : group;
+
+    if (typeof id !== "string" || !UUID.test(id)) {
+      throw new Error(
+        `subscribergroups must be subscriber group UUIDs, as reported by ` +
+          `worldanvil_list_subscribergroups — a UUID string, a { id: "uuid" } ` +
+          `object, or an array of either. Pass [] to remove every group. ` +
+          `World Anvil accepts other shapes and silently clears the existing ` +
+          `groups instead, so this is refused rather than sent. ` +
+          `Got: ${JSON.stringify(group)}`,
+      );
+    }
+
+    return { id };
+  });
+}
+
+/**
  * File a block, into whichever of the two folder systems the id belongs to.
  *
  * A Block carries two unrelated folder fields, and which one a world uses
@@ -311,6 +365,9 @@ export async function handleToolCall(name, args, client) {
           Object.assign(data, buildReferences(args.references));
         }
         if (args.category_id) data.category = { id: args.category_id };
+        if (args.subscribergroups !== undefined) {
+          data.subscribergroups = buildSubscriberGroups(args.subscribergroups);
+        }
         return articleWriteResponse(await client.createArticle(data), args);
       }
 
@@ -328,6 +385,9 @@ export async function handleToolCall(name, args, client) {
           Object.assign(data, buildReferences(args.references));
         }
         if (args.category_id) data.category = { id: args.category_id };
+        if (args.subscribergroups !== undefined) {
+          data.subscribergroups = buildSubscriberGroups(args.subscribergroups);
+        }
         return articleWriteResponse(
           await client.updateArticle(args.article_id, data),
           args,
@@ -514,6 +574,9 @@ export async function handleToolCall(name, args, client) {
         if (args.content !== undefined)
           data.content = markdownToBBCode(args.content);
         if (args.article_id) data.article = { id: args.article_id };
+        if (args.subscribergroups !== undefined) {
+          data.subscribergroups = buildSubscriberGroups(args.subscribergroups);
+        }
         return jsonResponse(await client.createSecret(data));
       }
 
@@ -523,6 +586,9 @@ export async function handleToolCall(name, args, client) {
         if (args.content !== undefined)
           data.content = markdownToBBCode(args.content);
         if (args.article_id) data.article = { id: args.article_id };
+        if (args.subscribergroups !== undefined) {
+          data.subscribergroups = buildSubscriberGroups(args.subscribergroups);
+        }
         return jsonResponse(await client.updateSecret(args.secret_id, data));
       }
 

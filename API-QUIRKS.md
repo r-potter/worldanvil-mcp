@@ -104,6 +104,40 @@ publishes. `state` is also exposed outright on `create`/`update` for `marker`,
 
 See ISSUES.md #4. Treat any agent-driven write as capable of publishing.
 
+## `subscribergroups` fails in the direction that removes gating
+
+The shape rules, verified on PUT and PATCH of both `/article` and `/secret`:
+
+| sent | result |
+|---|---|
+| `[{ id: uuid }]` | written; several groups at once works |
+| `[]` | clears every group |
+| `"uuid"` | `success: true`, and **silently clears** the groups |
+| `["uuid"]` | rejected: 422 with a Doctrine trace on `/article`, a 500 HTML page on `/secret` |
+
+This is the **opposite** of the reference fields above, where the array is
+coerced to the literal text `"Array"` and only a bare string writes. There is
+no general array-vs-string rule to lean on; the shape is per-field.
+
+What makes this one worth care is the direction of the failure. Everywhere else
+in this file a wrong shape means a field does not get written. Here the wrong
+shape *removes* access control that was already there, and reports success — so
+the mistake is silent, and it is a mistake toward exposure. `create_article`
+and `update_article` normalise every accepted shape and refuse a non-UUID
+before the network rather than sending it.
+
+Gating is only consulted while `state` is `private`, and the two entities
+default opposite ways: **a bare article create lands `public`, a bare secret
+create lands `private`.** So the same call gates a secret immediately and does
+nothing observable to an article until its state is changed elsewhere. On a
+public world, groups on a `public` article restrict nothing.
+
+This is also one of the few places the vendor spec is *right* — `state` and
+`subscribergroups` appear on the Secret create, update and granularity-2
+schemas exactly as the API behaves. Worth probing anyway; it was right here and
+wrong about `/variable_collection`, flat variable fields, and `folderId` being
+read-only.
+
 ## The one that cannot be caught by reading the write back
 
 A block's world membership appears on **no field of the block, at any

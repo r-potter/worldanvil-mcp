@@ -173,6 +173,12 @@ export function getToolDefinitions() {
               'Links to other articles. Each value may be a UUID string, a { "id": "uuid" } object as the published OpenAPI schema describes, or an array of either — all are normalised to the plain UUID string World Anvil actually stores, comma-joined for multiples. (The documented object shape is honoured by articleParent but coerced to the literal text "Array" by articleNext and articlePrevious, so it is not passed through.) WRITABLE, verified against a live world: articleParent, articleNext, articlePrevious (all templates); relatedReports (report); locations (plot). REFUSED because World Anvil accepts then silently discards them (web editor only): primarygeographicLocation, secondarygeographicLocation, species, ethnicity, currentLocation, geographicLocation. `timeline` is read-only per the spec and is set from the timeline side. Example: { "articleNext": "uuid", "relatedReports": ["uuid1", "uuid2"] }',
             additionalProperties: true,
           },
+          subscribergroups: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              'Subscriber groups this article is gated to, as UUIDs from worldanvil_list_subscribergroups. A single UUID string or a { "id": "uuid" } object is accepted too; pass [] to remove every group. Gating is only consulted while the article\'s `state` is private — a public article stays readable regardless of its groups, and `state` is deliberately not settable through this server. Anything that is not a UUID is refused rather than sent, because World Anvil accepts the wrong shape and silently clears the article\'s existing groups.',
+          },
         },
         required: ["title", "world_id", "template"],
       },
@@ -223,6 +229,12 @@ export function getToolDefinitions() {
             description:
               'Links to other articles. Each value may be a UUID string, a { "id": "uuid" } object as the published OpenAPI schema describes, or an array of either — all are normalised to the plain UUID string World Anvil actually stores, comma-joined for multiples. (The documented object shape is honoured by articleParent but coerced to the literal text "Array" by articleNext and articlePrevious, so it is not passed through.) WRITABLE, verified against a live world: articleParent, articleNext, articlePrevious (all templates); relatedReports (report); locations (plot). REFUSED because World Anvil accepts then silently discards them (web editor only): primarygeographicLocation, secondarygeographicLocation, species, ethnicity, currentLocation, geographicLocation. `timeline` is read-only per the spec and is set from the timeline side. Example: { "articleNext": "uuid", "relatedReports": ["uuid1", "uuid2"] }',
             additionalProperties: true,
+          },
+          subscribergroups: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              'Subscriber groups this article is gated to, as UUIDs from worldanvil_list_subscribergroups. Replaces the article\'s groups outright rather than adding to them; a single UUID string or a { "id": "uuid" } object is accepted too, and [] removes every group. Gating is only consulted while the article\'s `state` is private — a public article stays readable regardless of its groups, and `state` is deliberately not settable through this server. Anything that is not a UUID is refused rather than sent, because World Anvil accepts the wrong shape and silently clears the article\'s existing groups.',
           },
         },
         required: ["article_id"],
@@ -602,6 +614,12 @@ export function getToolDefinitions() {
             description:
               "ID of the article to attach this secret to (optional)",
           },
+          subscribergroups: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              'Subscriber groups this secret is gated to, as UUIDs from worldanvil_list_subscribergroups. A single UUID string or a { "id": "uuid" } object is accepted too; pass [] to remove every group. A secret is created `private`, so the groups apply immediately — unlike an article, which is created `public` and ignores its groups until the state is changed in the web editor. Anything that is not a UUID is refused rather than sent, because World Anvil accepts the wrong shape and silently clears the existing groups.',
+          },
         },
         required: ["title", "world_id"],
       },
@@ -619,6 +637,12 @@ export function getToolDefinitions() {
             type: "string",
             description:
               "ID of the article to attach this secret to (optional)",
+          },
+          subscribergroups: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              'Subscriber groups this secret is gated to, as UUIDs from worldanvil_list_subscribergroups. Replaces the secret\'s groups outright rather than adding to them; a single UUID string or a { "id": "uuid" } object is accepted too, and [] removes every group. A secret is private by default, so its groups are what actually gates it. Anything that is not a UUID is refused rather than sent, because World Anvil accepts the wrong shape and silently clears the existing groups.',
           },
         },
         required: ["secret_id"],

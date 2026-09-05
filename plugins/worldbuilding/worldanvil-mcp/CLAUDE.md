@@ -1433,6 +1433,30 @@ STRATEGY
 4. Revealed secrets → change to appropriate level
 ```
 
+### What this server can set, and what it will not
+
+`worldanvil_create_article`, `worldanvil_update_article`,
+`worldanvil_create_secret` and `worldanvil_update_secret` take a
+`subscribergroups` parameter — the subscriber groups the entity is gated to, as
+UUIDs from `worldanvil_list_subscribergroups`. Pass `[]` to remove every group.
+It **replaces** the groups rather than adding to them, so read the entity first
+if you mean to add one.
+
+Two things to know before relying on it:
+
+- **Gating is only consulted while `state` is `private`**, and articles and
+  secrets default opposite ways. A new **secret is private**, so its groups
+  gate it straight away. A new **article is public**, so its groups do nothing
+  until someone changes the state in the web editor.
+- **`state` is deliberately not settable through this server.** An agent can
+  restrict an already-private article or secret, and cannot publish one. If you
+  need to change publication state, do it in the web editor — that is the point.
+
+So for GM-only material that must actually stay hidden, put it in a **secret**
+and gate that. Gating an article through this server does not hide it.
+
+Everything else in the visibility list above is web-editor work.
+
 ### Campaign Organization Pattern
 
 From power user research (Ethnis, Istralar):
